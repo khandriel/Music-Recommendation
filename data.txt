@@ -1,0 +1,274 @@
+Carregando 200 arquivos JSON...
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 200/200 [01:22<00:00,  2.41it/s]
+Total de playlists carregadas: 200000
+Playlists: 200000 | Músicas Únicas: 995382
+Catálogo para Conteúdo: 995382 músicas | Matriz TF-IDF: (995382, 20000)
+
+============================================================
+MODELO 1 — FILTRAGEM COLABORATIVA
+============================================================
+2026-04-24 13:39:46.904461: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX AVX2
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2026-04-24 13:39:49.228640: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1616] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 5980 MB memory:  -> device: 0, name: NVIDIA GeForce RTX 2070, pci bus id: 0000:01:00.0, compute capability: 7.5
+2026-04-24 13:39:55.405703: W tensorflow/core/framework/cpu_allocator_impl.cc:82] Allocation of 170340160 exceeds 10% of free system memory.
+2026-04-24 13:39:55.477083: W tensorflow/core/framework/cpu_allocator_impl.cc:82] Allocation of 170340160 exceeds 10% of free system memory.
+2026-04-24 13:39:57.148946: W tensorflow/core/framework/cpu_allocator_impl.cc:82] Allocation of 170340160 exceeds 10% of free system memory.
+2026-04-24 13:39:57.210907: W tensorflow/core/framework/cpu_allocator_impl.cc:82] Allocation of 170340160 exceeds 10% of free system memory.
+Epoch 1/10
+2026-04-24 13:40:00.834353: W tensorflow/core/framework/cpu_allocator_impl.cc:82] Allocation of 170340160 exceeds 10% of free system memory.
+5199/5199 [==============================] - 159s 28ms/step - loss: 0.5208 - accuracy: 0.7588
+Epoch 2/10
+5199/5199 [==============================] - 146s 28ms/step - loss: 0.2664 - accuracy: 0.8991
+Epoch 3/10
+5199/5199 [==============================] - 146s 28ms/step - loss: 0.1843 - accuracy: 0.9321
+Epoch 4/10
+5199/5199 [==============================] - 149s 29ms/step - loss: 0.1283 - accuracy: 0.9572
+Epoch 5/10
+5199/5199 [==============================] - 159s 31ms/step - loss: 0.0876 - accuracy: 0.9724
+Epoch 6/10
+5199/5199 [==============================] - 156s 30ms/step - loss: 0.0590 - accuracy: 0.9824
+Epoch 7/10
+5199/5199 [==============================] - 155s 30ms/step - loss: 0.0390 - accuracy: 0.9892
+Epoch 8/10
+5199/5199 [==============================] - 154s 30ms/step - loss: 0.0251 - accuracy: 0.9937
+Epoch 9/10
+5199/5199 [==============================] - 151s 29ms/step - loss: 0.0158 - accuracy: 0.9965
+Epoch 10/10
+5199/5199 [==============================] - 156s 30ms/step - loss: 0.0097 - accuracy: 0.9982
+
+Playlist PID: 0 | Músicas na Playlist: 52
+Músicas removidas para teste (o que o modelo deve tentar recuperar):
+ - Soak Up The Sun
+ - Ice Box
+ - Beep
+ - Miss Independent
+ - Where Is The Love?
+ - Check Yes Juliet
+ - Jumpin', Jumpin'
+ - Leavin'
+ - A Thousand Miles
+ - Buttons
+
+Recuperadas no Top 200: 1 de 10
+--- Top Recomendações ---
+1. Bitch Better Have My Money 
+2. No Sense 
+3. Counting Stars 
+4. Shut Up and Dance 
+5. Too Good 
+6. Semi-Charmed Life 
+7. Gold Digger 
+8. Lose Yourself - Soundtrack Version 
+9. Ocean Avenue 
+10. Straight Outta Compton 
+11. Chicken Fried 
+12. That's My Kind Of Night 
+13. Break Up In A Small Town 
+14. The Choice Is Yours (Revisited) 
+15. Want to Want Me 
+16. My Girl 
+17. Life Is A Highway 
+18. Leave The Night On 
+19. Thinking Out Loud 
+20. Treasure 
+21. Cruise 
+22. Titanium (feat. Sia) - feat. Sia 
+23. Hooked on a Feeling 
+24. Stitches 
+25. Closing Time 
+26. Kiss 
+27. How to Save a Life 
+28. Bye Bye Bye 
+29. Hey There Delilah 
+30. Knee Deep (feat. Jimmy Buffett) 
+
+Playlist PID: 1 | Músicas na Playlist: 39
+Músicas removidas para teste (o que o modelo deve tentar recuperar):
+ - He's a Pirate (Pirates of the Caribbean)
+ - Fortunate Son
+ - Stairway To Heaven
+ - Ghost Love Score
+ - Sweet Child O' Mine
+ - Witch Hunt
+ - Crazy
+
+Recuperadas no Top 200: 2 de 7
+--- Top Recomendações ---
+1. Walk This Way 
+2. Paint It Black 
+3. Hey Joe 
+4. One Day More 
+5. Heartbreaker 
+6. I'm Not In Love 
+7. Do You Hear The People Sing? 
+8. (Don't Fear) The Reaper 
+9. Another One Bites The Dust - Remastered 2011 
+10. Video Killed The Radio Star 
+11. Rock And Roll All Nite 
+12. War Pigs/Luke's Wall - Remastered Version 
+13. We're Not Gonna Take It 
+14. Dreams 
+15. Take A Chance On Me 
+16. Holding Out for a Hero 
+17. Bad Medicine 
+18. Renegade 
+19. You Make My Dreams - Remastered 
+20. Welcome To The Jungle 
+21. Smoke On the Water 
+22. Come Sail Away 
+23. Ghostbusters 
+24. Hungry Like The Wolf - 2009 Remastered Version 
+25. Monster Mash 
+26. O-o-h Child - Remastered 
+27. I Want You Back 
+28. I'm Gonna Be (500 Miles) 
+29. She's Not There 
+30. It's the End of the World As We Know It (And I Feel Fine) 
+
+Playlist PID: 2 | Músicas na Playlist: 64
+Músicas removidas para teste (o que o modelo deve tentar recuperar):
+ - MIC Drop
+ - Oh NaNa (Hidden. HUR YOUNG JI)
+ - 21st Century Girl
+ - Drive (feat. Gray)
+ - Untitled, 2014 - KR Ver.
+ - 꺼내 먹어요 (Eat)
+ - Solo (feat. Hoody)
+ - The Manual
+ - WHISTLE - KR Ver.
+ - EYES, NOSE, LIPS - KR Ver.
+ - Hold Me Tight
+ - Anck Su Namum
+
+Recuperadas no Top 200: 8 de 12
+--- Top Recomendações ---
+1. Lotto 
+2. Hate 
+3. IF YOU - KR ver. 
+4. Run 
+5. Lion Heart 
+6. 21st Century Girl ✅ ACERTO
+7. I Need U 
+8. BTS Cypher 4 
+9. 소방차 Fire Truck 
+10. 으르렁 Growl 
+11. CALL ME BABY 
+12. Silver Spoon 
+13. Awake 
+14. Not Today 
+15. Dope 
+16. SOBER - KR ver. 
+17. BOOMBAYAH - KR Ver. 
+18. Bad Boy 
+19. The 7th Sense 
+20. PLAYING WITH FIRE - KR Ver. 
+21. WHISTLE - KR Ver. ✅ ACERTO
+22. BANG BANG BANG - KR ver. 
+23. Monster 
+24. VERY NICE 
+25. Blood Sweat & Tears 
+26. LOSER - KR ver. 
+27. Crazy 
+28. Outro: House Of Cards 
+29. HERO 
+30. That XX 
+
+Playlist PID: 3 | Músicas na Playlist: 126
+Músicas removidas para teste (o que o modelo deve tentar recuperar):
+ - Driftless
+ - Bethlehem
+ - Affection
+ - Chief Rocka
+ - Strangest Eyes
+ - Interference
+ - Only A Lad
+ - Last Of The Good Old Days
+ - Push
+ - Heart It Races - Dr Dog Version
+ - Campus
+ - Looking out for You
+ - Kalte Wut / Wenn Ich Einmal Reich Bin
+ - Contraband
+ - Lost Youth / Lost You
+ - Serving Goffman
+ - Why iii Love The Moon.
+ - Lucky Girl
+ - Turning Japanese
+ - Talk To Me
+ - You Loved Me, You Killed Me
+ - I'm So Ugly
+ - 10:1
+ - A Sunday Kind Of Love - Single Version
+ - Elegy
+
+Recuperadas no Top 200: 1 de 25
+--- Top Recomendações ---
+1. He Can Only Hold Her 
+2. We're All In This Together 
+3. Do You Hear The People Sing? 
+4. The Room Where It Happens 
+5. Little Bit 
+6. Someone In The Crowd - From "La La Land" Soundtrack 
+7. Burn 
+8. Runnin' 
+9. Marilyn Monroe 
+10. Dead Girl Walking (feat. Barrett Wilbert Weed & Ryan McCartan) 
+11. Gravel Pit 
+12. For Good - From "Wicked" Original Broadway Cast Recording/2003 
+13. Definition 
+14. Aaron Burr, Sir 
+15. Islands 
+16. My Shot 
+17. Bonita Applebum - includes 'Can I Kick It' Intro 
+18. Concrete Schoolyard 
+19. Water 
+20. Award Tour 
+21. The Story Of Tonight 
+22. Mia & Sebastian’s Theme - From "La La Land" Soundtrack 
+23. King Of New York 
+24. Mamma Mia - From "Mamma Mia!" Soundtrack 
+25. Summer Nights - From "Grease Live!" Music From The Television Event 
+26. Hopelessly Devoted To You 
+27. As Long As You're Mine - From "Wicked" Original Broadway Cast Recording/2003 
+28. The Breeze 
+29. Miss You 
+30. Gimme Sympathy 
+
+Playlist PID: 4 | Músicas na Playlist: 17
+Músicas removidas para teste (o que o modelo deve tentar recuperar):
+ - Smooth Operator - Single Version
+ - Jealousy - Remastered Single Version
+ - The Freshmen
+
+Recuperadas no Top 200: 0 de 3
+--- Top Recomendações ---
+1. Straight Outta Compton 
+2. The Choice Is Yours (Revisited) 
+3. I Want You Back 
+4. Closing Time 
+5. Walk This Way 
+6. Island In The Sun 
+7. Into The Mystic 
+8. My Girl 
+9. How to Save a Life 
+10. Treasure 
+11. Bohemian Rhapsody - Remastered 2011 
+12. Lose Yourself - Soundtrack Version 
+13. Semi-Charmed Life 
+14. What A Wonderful World - Single Version 
+15. Ocean Avenue 
+16. No Diggity 
+17. Don't Stop Me Now - Remastered 
+18. After the Disco 
+19. Kiss 
+20. Another One Bites The Dust - Remastered 2011 
+21. Who's Lovin' You 
+22. Y.M.C.A. 
+23. You Can Call Me Al 
+24. Brown Eyed Girl 
+25. Adam's Song 
+26. Piano Man 
+27. Say My Name 
+28. Hooked on a Feeling 
+29. You Give Love A Bad Name 
+30. Move Along

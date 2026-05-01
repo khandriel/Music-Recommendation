@@ -1,0 +1,28 @@
+# =============================================================================
+# requirements.txt — Dependências do projeto
+#
+# Instalação:
+#   pip install -r requirements.txt
+#
+# GPU (opcional, recomendado usar anaconda):
+#   Requer CUDA 12.3 + cuDNN 8.9 instalados no sistema.
+# =============================================================================
+
+# --- Dados ---
+kagglehub
+pandas
+numpy
+tqdm
+
+# --- Modelos ---
+scikit-learn
+scipy
+joblib
+
+# --- Deep Learning (colaborativo) ---
+# Com suporte a GPU (recomendado):
+tensorflow[and-cuda]==2.21.0
+# Apenas CPU (alternativa):
+# tensorflow==2.21.0
+
+keras
