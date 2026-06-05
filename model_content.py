@@ -242,7 +242,7 @@ if __name__ == "__main__":
          content_df, tfidf, tfidf_matrix) = load_cache()
     else:
         print("Nenhum cache encontrado — processando do zero...")
-        df = load_dataset(n_files=200)
+        df = load_dataset()
         interactions_df, pid_map, track_map, reverse_track_map, uri_to_name = build_interactions(df)
         content_df, tfidf, tfidf_matrix = build_content_catalog(df)
         save_cache(interactions_df, pid_map, track_map, reverse_track_map,

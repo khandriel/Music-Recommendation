@@ -1,0 +1,39 @@
+# =============================================================
+# Dados gerados — reproduzíveis, não precisam de versionamento
+# =============================================================
+
+# Arquivo de dados brutos local
+data.txt
+
+# Modelo colaborativo treinado (pode ser retreinado com python main.py)
+saved_models/
+
+# Cache de dados pré-processados (TF-IDF, DataFrames, mapeamentos)
+# Regenerado automaticamente ao rodar main.py ou model_content.py
+cache/
+
+# =============================================================
+# Python
+# =============================================================
+__pycache__/
+*.py[cod]
+
+# =============================================================
+# Ambiente virtual
+# =============================================================
+.venv/
+venv/
+env/
+
+# =============================================================
+# IDEs e ferramentas
+# =============================================================
+.vscode/
+.idea/
+.claude/
+
+# =============================================================
+# Sistema operacional
+# =============================================================
+.DS_Store
+Thumbs.db

@@ -1,28 +1,33 @@
 # =============================================================================
 # requirements.txt — Dependências do projeto
 #
-# Instalação:
+# INSTALAÇÃO (CPU, mais simples):
+#   1. Comente a linha "tensorflow[and-cuda]" abaixo e descomente "tensorflow"
+#   2. pip install -r requirements.txt
+#
+# INSTALAÇÃO (GPU, recomendada para treinar — muito mais rápido):
+#   Requer driver NVIDIA + CUDA 12.x. O pacote tensorflow[and-cuda] já traz
+#   as bibliotecas CUDA/cuDNN necessárias via pip (não precisa instalar à mão).
 #   pip install -r requirements.txt
 #
-# GPU (opcional, recomendado usar anaconda):
-#   Requer CUDA 12.3 + cuDNN 8.9 instalados no sistema.
+# Python testado: 3.10
+# Passo a passo completo de execução: veja o README.md
 # =============================================================================
 
-# --- Dados ---
-kagglehub
-pandas
-numpy
-tqdm
+# --- Carregamento e pré-processamento de dados ---
+kagglehub          # download do dataset Spotify Million Playlist
+pandas             # manipulação dos DataFrames
+numpy              # operações numéricas / vetorização
+tqdm               # barra de progresso ao ler os JSONs
 
-# --- Modelos ---
-scikit-learn
-scipy
-joblib
+# --- Modelo content-based e utilitários ---
+scikit-learn       # TF-IDF, train_test_split, similaridade de cosseno
+scipy              # matriz esparsa TF-IDF (save_npz/load_npz)
+joblib             # serialização do cache (vetorizador, DataFrames)
 
-# --- Deep Learning (colaborativo) ---
-# Com suporte a GPU (recomendado):
+# --- Deep Learning (modelo colaborativo NeuMF) ---
+# GPU (recomendado):
 tensorflow[and-cuda]==2.21.0
-# Apenas CPU (alternativa):
+# CPU (alternativa — comente a linha acima e descomente a abaixo):
 # tensorflow==2.21.0
-
-keras
+keras              # API de alto nível usada para construir a rede
