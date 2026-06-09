@@ -373,7 +373,7 @@ class CollaborativeRecommender:
             if hits:
                 print("Músicas recuperadas:")
                 for idx in hits:
-                    print(f"  ✅ {self.uri_to_name.get(self.reverse_track_map[idx], '?')}")
+                    print(f"  {self.uri_to_name.get(self.reverse_track_map[idx], '?')}")
             else:
                 print("Nenhuma música recuperada.")
 

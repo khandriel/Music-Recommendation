@@ -6,9 +6,9 @@ interface comum:
 
 | Modelo | Arquivo | Status | Ideia |
 |---|---|---|---|
-| **Colaborativo** | [`model_collaborative.py`](model_collaborative.py) | ✅ Completo | Rede neural NeuMF (GMF + MLP) que aprende co-ocorrências playlist↔música |
-| **Content-based** | [`model_content.py`](model_content.py) | ✅ Completo | TF-IDF (nome + artista) + similaridade de cosseno |
-| **Híbrido** | [`model_hybrid.py`](model_hybrid.py) | 🚧 Parcial | Estrutura pronta; combina os dois sinais (colaborativo ainda a integrar) |
+| **Colaborativo** | [`model_collaborative.py`](model_collaborative.py) | Completo | Rede neural NeuMF (GMF + MLP) que aprende co-ocorrências playlist↔música |
+| **Content-based** | [`model_content.py`](model_content.py) | Completo | TF-IDF (nome + artista) + similaridade de cosseno |
+| **Híbrido** | [`model_hybrid.py`](model_hybrid.py) | Parcial | Estrutura pronta; combina os dois sinais (colaborativo ainda a integrar) |
 
 ---
 
@@ -86,7 +86,7 @@ reprocessar/retreinar. Para forçar do zero:
 | Reprocessar os dados | `cache/` |
 | **Trocar `N_FILES`** | `cache/` **e** `saved_models/` |
 
-> ⚠️ O `cache/` **não guarda** o valor de `N_FILES`. Se você mudar `N_FILES`
+> O `cache/` **não guarda** o valor de `N_FILES`. Se você mudar `N_FILES`
 > sem apagar o `cache/`, o programa usará os dados antigos silenciosamente.
 
 ## 5. Como funciona a avaliação
