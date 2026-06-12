@@ -12,6 +12,9 @@ saved_models/
 # Regenerado automaticamente ao rodar main.py ou model_content.py
 cache/
 
+# Relatório de comparação (gerado por compare_collaborative.py)
+comparison_report.txt
+
 # =============================================================
 # Python
 # =============================================================

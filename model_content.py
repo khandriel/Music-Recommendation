@@ -587,8 +587,7 @@ for b, v in zip(bars, deltas):
  ax.text(v + (0.0002 if v >= 0 else -0.0002), b.get_y() + b.get_height()/2,
  f"{v:+.4f}", va='center', ha='left' if v >= 0 else 'right', fontsize=8)
 ax.set_xlabel("Delta NDCG@10 (ON − OFF)")
-ax.set_title("Impacto de cada feature
-(verde=ajuda | cinza=neutro | vermelho=atrapalha)")
+ax.set_title("Impacto de cada feature\n(verde=ajuda | cinza=neutro | vermelho=atrapalha)")
 
 # --- Plot 2: NDCG@10 por número de features ativas ---
 ax = axes[1]

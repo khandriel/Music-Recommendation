@@ -9,6 +9,7 @@ import kagglehub
 import pandas as pd
 import numpy as np
 import os, glob, json
+import joblib
 from tqdm import tqdm
 
 # =============================================================================
@@ -98,6 +99,62 @@ def build_interactions(df: pd.DataFrame) -> tuple:
     num_tracks    = len(track_map)
     print(f"Playlists: {num_playlists} | Músicas Únicas: {num_tracks}")
 
+    return interactions_df, pid_map, track_map, reverse_track_map, uri_to_name
+
+# =============================================================================
+# CACHE DOS DADOS PROCESSADOS
+# =============================================================================
+#
+# O download bruto NUNCA se repete (o kagglehub guarda os arquivos em
+# ~/.cache/kagglehub). O que custava minutos a cada execução era reler e
+# parsear as centenas de JSONs + montar as interações. Este cache guarda o
+# RESULTADO do pré-processamento em um único joblib, carregado em segundos.
+#
+# O n_files usado fica registrado dentro do cache: se você mudar N_FILES, o
+# cache é invalidado e os dados são reprocessados AUTOMATICAMENTE — não é
+# preciso apagar a pasta cache/ à mão.
+
+CACHE_DIR  = "cache"
+CACHE_PATH = os.path.join(CACHE_DIR, "interactions_cache.joblib")
+
+
+def load_or_process_interactions(n_files: int = N_FILES) -> tuple:
+    """
+    Retorna (interactions_df, pid_map, track_map, reverse_track_map,
+    uri_to_name), usando o cache em disco quando existir e tiver sido gerado
+    com o MESMO n_files; caso contrário, processa do zero e salva o cache.
+    """
+    if os.path.exists(CACHE_PATH):
+        try:
+            payload = joblib.load(CACHE_PATH)
+        except Exception as e:
+            print(f"Cache ilegível ({e}) — reprocessando do zero...")
+            payload = None
+        if payload is not None:
+            if payload.get('n_files') == n_files:
+                print(f"Cache encontrado (n_files={n_files}) — "
+                      f"carregando de '{CACHE_PATH}'...")
+                return (payload['interactions_df'], payload['pid_map'],
+                        payload['track_map'], payload['reverse_track_map'],
+                        payload['uri_to_name'])
+            print(f"Cache foi gerado com n_files={payload.get('n_files')}, "
+                  f"mas o atual é {n_files} — reprocessando...")
+
+    df = load_dataset(n_files)
+    interactions_df, pid_map, track_map, reverse_track_map, uri_to_name = build_interactions(df)
+    # O df bruto (playlists + listas de tracks) não é mais necessário.
+    del df
+
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    print(f"Salvando cache em '{CACHE_PATH}'...")
+    joblib.dump({
+        'n_files':           n_files,
+        'interactions_df':   interactions_df,
+        'pid_map':           pid_map,
+        'track_map':         track_map,
+        'reverse_track_map': reverse_track_map,
+        'uri_to_name':       uri_to_name,
+    }, CACHE_PATH)
     return interactions_df, pid_map, track_map, reverse_track_map, uri_to_name
 
 def build_content_catalog(df: pd.DataFrame) -> tuple:

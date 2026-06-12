@@ -1,114 +1,107 @@
 # =============================================================================
-# main.py — Ponto de entrada: seleciona e executa o modelo desejado
+# main.py — Ponto de entrada de TREINO dos modelos colaborativos
 #
-# USO: python main.py
+# Escolha nas flags abaixo QUAIS modelos treinar. Os escolhidos rodam UM DE
+# CADA VEZ (sequencial — pensado para máquinas que não comportam mais de um
+# modelo na memória). Para treinar todos, deixe todas as flags em True.
 #
-# Selecione o modelo alterando a variável MODEL abaixo:
-#   "collaborative" — Filtragem Colaborativa pura (NeuMF) — baseline de comparação
-#   "content"       — Filtragem Baseada em Conteúdo       — placeholder (a implementar)
-#   "hybrid"        — Modelo Híbrido (Content-Based ativo, Colaborativo pendente)
+# Modelos já salvos em saved_models/ NÃO são retreinados — são apenas
+# carregados (a mensagem indica qual caso ocorreu). Para forçar o retreino,
+# apague o arquivo correspondente em saved_models/.
 #
-# Primeira execução:
-#   - Processa os dados e salva em cache/
-#   - Se MODEL == "collaborative", treina a rede e salva em saved_models/
-# Execuções seguintes:
-#   - Carrega o cache de cache/ e o modelo de saved_models/ (se aplicável)
+# A AVALIAÇÃO/COMPARAÇÃO não acontece aqui: toda a lógica de teste (escolha
+# das playlists, remoção de músicas, métricas, relatório) vive em
+# compare_collaborative.py.
 #
-# IMPORTANTE: o cache/ NÃO guarda o valor de N_FILES. Se você alterar N_FILES,
-# apague a pasta cache/ (e saved_models/) para reprocessar e retreinar.
+# USO:
+#   Treinar:   python main.py
+#   Comparar:  python compare_collaborative.py
+#
+# NOTA: o content-based (model_content.py) e o híbrido (model_hybrid.py)
+# estão DESATIVADOS por enquanto (dependem do model_content, fora do ar).
+# A fiação antiga deles está no histórico do git (main.py anterior).
 # =============================================================================
 
 # =============================================================================
-# CONFIGURAÇÃO — altere aqui
+# CONFIGURAÇÃO — escolha o que treinar
 # =============================================================================
-MODEL   = "collaborative"  # "collaborative" | "content" | "hybrid"
-N_FILES = 350              # Arquivos JSON a carregar (cada arquivo = 1000 playlists)
+TRAIN_ALS     = True   # Matrix Factorization implícita (leve)
+TRAIN_ITEMKNN = True   # Item-item kNN por co-ocorrência (leve)
+TRAIN_NEUMF   = True   # Rede neural NeuMF (PESADO — fica por último)
 
-# =============================================================================
-# IMPORTS
-# =============================================================================
-# model_content é sempre necessário (gerencia o cache de dados).
-# model_collaborative e model_hybrid são importados sob demanda dentro de
-# cada bloco, para não carregar TensorFlow/etc. quando não forem usados.
-
-from data_processing import load_dataset, build_interactions, build_content_catalog
-import model_content as content
+N_FILES = 350          # Arquivos JSON do dataset (cada um = 1000 playlists)
 
 # =============================================================================
 # EXECUÇÃO
 # =============================================================================
 
+import os
+# BLAS em 1 thread ANTES de qualquer import que carregue o numpy — evita
+# oversubscription com o paralelismo interno do implicit (mesmo ajuste feito
+# nos arquivos de modelo, repetido aqui porque o numpy entra antes deles).
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+
+import gc
+import time
+import traceback
+
+from data_processing import load_or_process_interactions
+
+
+# Os imports dos modelos ficam DENTRO das funções: TensorFlow/implicit só são
+# carregados na vez do respectivo modelo (não pesam na memória dos demais).
+
+def treinar_als(data):
+    from model_collaborative_als import ALSRecommender
+    ALSRecommender.load_or_train(*data)
+
+
+def treinar_itemknn(data):
+    from model_collaborative_itemknn import ItemKNNRecommender
+    ItemKNNRecommender.load_or_train(*data)
+
+
+def treinar_neumf(data):
+    from model_collaborative_neumf import NeuMFRecommender
+    NeuMFRecommender.load_or_train(*data)
+    import keras
+    keras.backend.clear_session()   # libera o grafo TF após salvar
+
+
+# Ordem: do mais leve ao mais pesado (NeuMF/TensorFlow por último)
+PLANO = [
+    ("ALS (Matrix Factorization)", TRAIN_ALS,     treinar_als),
+    ("Item-kNN (co-ocorrência)",   TRAIN_ITEMKNN, treinar_itemknn),
+    ("NeuMF (rede neural)",        TRAIN_NEUMF,   treinar_neumf),
+]
+
 if __name__ == "__main__":
+    data = load_or_process_interactions(N_FILES)
 
-    # -------------------------------------------------------------------------
-    # Dados pré-processados — cache/
-    # -------------------------------------------------------------------------
-    if content.cache_exists():
-        print("Cache encontrado — carregando do disco...")
-        print(f"ATENÇÃO: o cache é usado independente de N_FILES (={N_FILES}). "
-              "Se mudou N_FILES, apague a pasta cache/ para reprocessar.")
-        (interactions_df, pid_map, track_map,
-         reverse_track_map, uri_to_name,
-         content_df, tfidf, tfidf_matrix) = content.load_cache()
-    else:
-        print("Nenhum cache encontrado — processando do zero (isso pode demorar)...")
-        df = load_dataset(n_files=N_FILES)
-        interactions_df, pid_map, track_map, reverse_track_map, uri_to_name = build_interactions(df)
-        content_df, tfidf, tfidf_matrix = build_content_catalog(df)
-        # O df bruto (playlists + listas de tracks) não é mais necessário —
-        # libera a RAM antes de treinar/avaliar.
-        del df
-        content.save_cache(
-            interactions_df, pid_map, track_map, reverse_track_map,
-            uri_to_name, content_df, tfidf, tfidf_matrix
-        )
+    resultados = []
+    for nome, ativo, fn in PLANO:
+        if not ativo:
+            resultados.append((nome, "pulado (flag desativada)"))
+            continue
+        print("\n" + "#" * 64)
+        print(f"# TREINO: {nome}")
+        print("#" * 64)
+        t0 = time.time()
+        try:
+            fn(data)
+            status = f"ok ({(time.time() - t0) / 60:.1f} min)"
+        except Exception:
+            print(f"\n*** '{nome}' falhou — seguindo para o próximo ***")
+            traceback.print_exc()
+            status = "FALHOU"
+        resultados.append((nome, status))
+        gc.collect()   # libera a memória do modelo antes do próximo
 
-    print("\n" + "=" * 60)
-    print(f"MODELO SELECIONADO: {MODEL.upper()}")
-    print("=" * 60)
-
-    # -------------------------------------------------------------------------
-    # MODELO: COLLABORATIVE — baseline puro NeuMF
-    # -------------------------------------------------------------------------
-    if MODEL == "collaborative":
-        from model_collaborative import CollaborativeRecommender
-        rec = CollaborativeRecommender.load_or_train(
-            interactions_df, pid_map, track_map, reverse_track_map, uri_to_name
-        )
-        rec.evaluate()
-
-    # -------------------------------------------------------------------------
-    # MODELO: CONTENT-BASED — placeholder
-    # -------------------------------------------------------------------------
-    elif MODEL == "content":
-        # TODO: instanciar e avaliar o modelo content-based standalone aqui
-        raise NotImplementedError(
-            "Modelo content-based standalone ainda não implementado.\n"
-            "Implemente a lógica em model_content.py e conecte aqui."
-        )
-
-    # -------------------------------------------------------------------------
-    # MODELO: HYBRID — content-based ativo, colaborativo pendente
-    # -------------------------------------------------------------------------
-    elif MODEL == "hybrid":
-        from model_hybrid import HybridRecommender
-        hybrid = HybridRecommender(
-            content_df=content_df,
-            tfidf_matrix=tfidf_matrix,
-            interactions_df=interactions_df,
-            uri_to_name=uri_to_name,
-            # Descomente as linhas abaixo quando integrar o colaborativo:
-            # collab_model=CollaborativeRecommender.load_or_train(
-            #     interactions_df, pid_map, track_map, reverse_track_map, uri_to_name
-            # ).model,
-            # pid_map=pid_map,
-            # track_map=track_map,
-            # reverse_track_map=reverse_track_map,
-            collab_weight=0.5,
-        )
-        hybrid.evaluate()
-
-    else:
-        raise ValueError(
-            f"MODEL inválido: '{MODEL}'. Use 'collaborative', 'content' ou 'hybrid'."
-        )
+    print("\n" + "=" * 64)
+    print("RESUMO DO TREINO")
+    print("=" * 64)
+    for nome, status in resultados:
+        print(f"  {nome:<30} {status}")
+    print("=" * 64)
+    print("Para avaliar e comparar os modelos: python compare_collaborative.py")
