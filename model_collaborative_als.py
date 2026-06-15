@@ -162,23 +162,29 @@ class ALSRecommender:
     # --------------------------------------------------------------------- #
     # INFERÊNCIA
     # --------------------------------------------------------------------- #
-    def recommend(self, pid_encoded, seed_idxs, exclude_idxs, top_k=500):
+    def score(self, pid_encoded, seed_idxs):
         """
-        Top-k músicas via fold-in a partir de `seed_idxs` (músicas conhecidas
-        da playlist), excluindo `exclude_idxs`. `pid_encoded` é IGNORADO — a
-        interface é a mesma nos três modelos colaborativos; aqui a playlist é
-        representada apenas pelas músicas seed (vetor latente em forma fechada).
+        Vetor de scores (num_tracks,) via fold-in a partir de `seed_idxs`, SEM
+        aplicar exclusões. Base comum de recommend() e do híbrido (late fusion).
+        `pid_encoded` é IGNORADO — a playlist é representada só pelas seeds.
         """
         Q = self.item_factors
         seed_idxs = np.asarray(seed_idxs, dtype=np.int64)
         if len(seed_idxs) == 0:
-            scores = np.zeros(Q.shape[0], dtype=np.float64)
-        else:
-            Qr = Q[seed_idxs]                                   # (n, f)
-            A  = self._QtQ + ALS_ALPHA * (Qr.T @ Qr) + ALS_REG * self._eye
-            b  = (1.0 + ALS_ALPHA) * Qr.sum(axis=0)             # (f,)
-            u  = np.linalg.solve(A, b)                          # (f,)
-            scores = Q @ u                                      # (num_tracks,)
+            return np.zeros(Q.shape[0], dtype=np.float64)
+        Qr = Q[seed_idxs]                                   # (n, f)
+        A  = self._QtQ + ALS_ALPHA * (Qr.T @ Qr) + ALS_REG * self._eye
+        b  = (1.0 + ALS_ALPHA) * Qr.sum(axis=0)             # (f,)
+        u  = np.linalg.solve(A, b)                          # (f,)
+        return Q @ u                                        # (num_tracks,)
+
+    def recommend(self, pid_encoded, seed_idxs, exclude_idxs, top_k=500):
+        """
+        Top-k músicas via fold-in a partir de `seed_idxs` (músicas conhecidas
+        da playlist), excluindo `exclude_idxs`. `pid_encoded` é IGNORADO (ver
+        score()); a interface é a mesma nos três modelos colaborativos.
+        """
+        scores = self.score(pid_encoded, seed_idxs)
 
         exclude_idxs = np.asarray(exclude_idxs, dtype=np.int64)
         if len(exclude_idxs) > 0:

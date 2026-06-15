@@ -397,12 +397,19 @@ class ContentRecommender:
 
         return score
 
-    def recommend(self, pid_encoded, seed_idxs, exclude_idxs, top_k=500,
-                  pesos: dict = None):
+    def score(self, pid_encoded, seed_idxs, pesos: dict = None):
+        """
+        Vetor de scores de conteúdo (num_tracks,) do catálogo contra o perfil-
+        centroide das seeds, no espaço colaborativo (track_encoded), SEM aplicar
+        exclusões. Base comum de recommend() e do híbrido (late fusion). Faixas
+        sem features de áudio (fora do CSV) ficam -inf: o conteúdo se ABSTÉM
+        delas — o híbrido trata isso usando só o colaborativo nessas faixas.
+        """
         if self.track_map is None or self.reverse_track_map is None:
             raise RuntimeError(
-                "recommend() colaborativo precisa de track_map/reverse_track_map — "
-                "passe os dados do data_processing em load_or_train().")
+                "score()/recommend() colaborativo precisa de track_map/"
+                "reverse_track_map — passe os dados do data_processing em "
+                "load_or_train().")
 
         pesos = pesos or PESOS_DEFAULT
         seed_idxs = np.asarray(seed_idxs, dtype=np.int64)
@@ -418,6 +425,11 @@ class ContentRecommender:
         scores = np.full(self.num_tracks, -np.inf, dtype=np.float64)
         valido = self.cidx_to_enc >= 0
         scores[self.cidx_to_enc[valido]] = scores_cat[valido]
+        return scores
+
+    def recommend(self, pid_encoded, seed_idxs, exclude_idxs, top_k=500,
+                  pesos: dict = None):
+        scores = self.score(pid_encoded, seed_idxs, pesos)
 
         exclude_idxs = np.asarray(exclude_idxs, dtype=np.int64)
         if len(exclude_idxs) > 0:

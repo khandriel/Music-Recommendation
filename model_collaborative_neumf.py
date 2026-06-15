@@ -263,18 +263,26 @@ class NeuMFRecommender:
     # --------------------------------------------------------------------- #
     # INFERÊNCIA
     # --------------------------------------------------------------------- #
-    def recommend(self, pid_encoded, seed_idxs, exclude_idxs, top_k=500):
+    def score(self, pid_encoded, seed_idxs=None):
         """
-        Top-k músicas pelo score NeuMF para `pid_encoded`, excluindo
-        `exclude_idxs`. `seed_idxs` é IGNORADO — o NeuMF representa a playlist
-        pelo embedding aprendido no treino (id da playlist), não pelas músicas
-        seed; o parâmetro existe para a interface ser a mesma nos três modelos.
+        Vetor de scores NeuMF (num_tracks,) para `pid_encoded` sobre todo o
+        catálogo, SEM aplicar exclusões. Base comum de recommend() e do híbrido
+        (late fusion). `seed_idxs` é IGNORADO — o NeuMF representa a playlist
+        pelo embedding aprendido no treino (id da playlist), não pelas seeds.
         """
         all_track_idxs = np.arange(self.num_tracks)
-        scores = self.model.predict(
+        return self.model.predict(
             [np.full(self.num_tracks, pid_encoded), all_track_idxs],
             batch_size=4096, verbose=0
         ).flatten().astype(np.float64)
+
+    def recommend(self, pid_encoded, seed_idxs, exclude_idxs, top_k=500):
+        """
+        Top-k músicas pelo score NeuMF para `pid_encoded`, excluindo
+        `exclude_idxs`. `seed_idxs` é IGNORADO (ver score()); o parâmetro existe
+        para a interface ser a mesma nos três modelos.
+        """
+        scores = self.score(pid_encoded, seed_idxs)
 
         exclude_idxs = np.asarray(exclude_idxs, dtype=np.int64)
         if len(exclude_idxs) > 0:

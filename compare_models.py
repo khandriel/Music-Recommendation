@@ -20,7 +20,9 @@
 #                              de áudio (audio_features.csv); as demais ficam de
 #                              fora do ranking — a cobertura parcial é uma
 #                              característica honesta do modelo, não é corrigida.
-#   (o híbrido ainda fica de fora desta comparação.)
+#   - Híbrido NeuMF+Content -> late fusion (model_hybrid.py): combina os scores
+#                              normalizados do NeuMF e do content. Só aparece se
+#                              AMBOS os componentes estiverem treinados.
 #
 # FLAGS:
 #   SHOW_DETAILS — inclui no TXT as playlists escolhidas e as músicas removidas
@@ -89,12 +91,32 @@ def _make_content(data):
     return ContentRecommender.load_or_train(*data)
 
 
+def _make_hybrid_neumf(data):
+    from model_hybrid import HybridRecommender
+    return HybridRecommender.build(data, colab_key="neumf")
+
+
+# O caminho de cada modelo pode ser uma str (1 arquivo) ou uma lista (o híbrido
+# compõe dois modelos salvos; só fica disponível se TODOS existirem).
+from model_hybrid import required_paths as _hybrid_paths
+
 MODELS = [
     ("ALS (Matrix Factorization)", os.path.join(MODELS_DIR, "collaborative_als.npz"),     _make_als),
     ("Item-kNN (co-ocorrência)",   os.path.join(MODELS_DIR, "collaborative_itemknn.npz"), _make_itemknn),
     ("Content-Based (áudio+gênero+ano)", os.path.join(MODELS_DIR, "content_based.joblib"), _make_content),
     ("NeuMF (rede neural)",        os.path.join(MODELS_DIR, "collaborative_neumf.keras"), _make_neumf),
+    ("Híbrido NeuMF+Content (late fusion)", _hybrid_paths("neumf"), _make_hybrid_neumf),
 ]
+
+
+def _model_available(path) -> bool:
+    """True se o(s) arquivo(s) requerido(s) existe(m) — str ou lista de str."""
+    paths = path if isinstance(path, (list, tuple)) else [path]
+    return all(os.path.exists(p) for p in paths)
+
+
+def _fmt_path(path) -> str:
+    return " + ".join(path) if isinstance(path, (list, tuple)) else path
 
 # =============================================================================
 # CONJUNTO DE TESTE — gerado UMA vez, compartilhado por todos os modelos
@@ -223,11 +245,11 @@ if __name__ == "__main__":
 
     disponiveis = []
     for nome, path, factory in MODELS:
-        if os.path.exists(path):
-            rep.append(f"  [OK]      {nome} — '{path}'")
+        if _model_available(path):
+            rep.append(f"  [OK]      {nome} — '{_fmt_path(path)}'")
             disponiveis.append((nome, factory))
         else:
-            rep.append(f"  [AUSENTE] {nome} — '{path}' não encontrado; "
+            rep.append(f"  [AUSENTE] {nome} — '{_fmt_path(path)}' não encontrado; "
                        f"treine com main.py (modelo PULADO)")
     rep.append("")
 
@@ -321,6 +343,9 @@ if __name__ == "__main__":
     tab.append("Content-Based usa SÓ conteúdo (áudio+gênero+ano): a playlist vira")
     tab.append("o perfil-centroide das restantes; faixas sem features de áudio não")
     tab.append("entram no ranking (cobertura parcial, reportada como está).")
+    tab.append("Híbrido = late fusion (min-max + média ponderada, alpha no colab):")
+    tab.append("combina os scores normalizados de NeuMF e Content; faixa sem áudio")
+    tab.append("usa só o colaborativo (o content se abstém, sem penalizá-la).")
 
     rep.extend(tab)
     for linha in tab:

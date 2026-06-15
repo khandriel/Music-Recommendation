@@ -18,7 +18,8 @@
 #   Comparar:  python compare_models.py
 #
 # NOTA: o content-based (model_content.py) já está integrado. O híbrido
-# (model_hybrid.py) ainda está DESATIVADO; sua fiação antiga está no git.
+# (model_hybrid.py) faz LATE FUSION (NeuMF+Content) — não treina nada próprio,
+# só garante que seus dois componentes existam (treina os que faltarem).
 # =============================================================================
 
 # =============================================================================
@@ -28,6 +29,7 @@ TRAIN_ALS     = False   # Matrix Factorization implícita (leve)
 TRAIN_ITEMKNN = False   # Item-item kNN por co-ocorrência (leve)
 TRAIN_CONTENT = False   # Content-Based puro (áudio+gênero+ano) a partir do CSV
 TRAIN_NEUMF   = False   # Rede neural NeuMF (PESADO — fica por último)
+TRAIN_HYBRID  = False   # Híbrido NeuMF+Content (compõe; treina o que faltar)
 
 N_FILES = 350          # Arquivos JSON do dataset (cada um = 1000 playlists)
 
@@ -74,12 +76,26 @@ def treinar_neumf(data):
     keras.backend.clear_session()   # libera o grafo TF após salvar
 
 
-# Ordem: do mais leve ao mais pesado (NeuMF/TensorFlow por último)
+def treinar_hybrid(data):
+    # Late fusion: não treina nada próprio — compõe NeuMF + Content, treinando
+    # os componentes que ainda não existirem em saved_models/.
+    from model_hybrid import HybridRecommender
+    HybridRecommender.load_or_train(*data)
+    try:
+        import keras
+        keras.backend.clear_session()
+    except Exception:
+        pass
+
+
+# Ordem: do mais leve ao mais pesado (NeuMF/TensorFlow por último; híbrido
+# depois, pois reaproveita o NeuMF e o content já treinados).
 PLANO = [
     ("ALS (Matrix Factorization)",       TRAIN_ALS,     treinar_als),
     ("Item-kNN (co-ocorrência)",         TRAIN_ITEMKNN, treinar_itemknn),
     ("Content-Based (áudio+gênero+ano)", TRAIN_CONTENT, treinar_content),
     ("NeuMF (rede neural)",              TRAIN_NEUMF,   treinar_neumf),
+    ("Híbrido NeuMF+Content",            TRAIN_HYBRID,  treinar_hybrid),
 ]
 
 if __name__ == "__main__":

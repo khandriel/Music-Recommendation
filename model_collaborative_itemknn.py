@@ -132,25 +132,31 @@ class ItemKNNRecommender:
     # --------------------------------------------------------------------- #
     # INFERÊNCIA
     # --------------------------------------------------------------------- #
-    def recommend(self, pid_encoded, seed_idxs, exclude_idxs, top_k=500):
+    def score(self, pid_encoded, seed_idxs):
         """
-        Top-k músicas somando a similaridade das músicas em `seed_idxs`
-        (músicas conhecidas da playlist) a todas as candidatas, excluindo
-        `exclude_idxs`. `pid_encoded` é IGNORADO — a interface é a mesma nos
-        três modelos colaborativos; aqui a playlist é representada apenas
-        pelas músicas seed.
+        Vetor de scores (num_tracks,) somando a similaridade das músicas em
+        `seed_idxs` a todas as candidatas, SEM aplicar exclusões. Base comum de
+        recommend() e do híbrido (late fusion). `pid_encoded` é IGNORADO — a
+        playlist é representada apenas pelas músicas seed.
         """
         seed_idxs = np.asarray(seed_idxs, dtype=np.int64)
         if len(seed_idxs) == 0:
-            scores = np.zeros(self.num_tracks, dtype=np.float64)
-        else:
-            # Vetor-linha binário das músicas seed (1 × num_tracks)
-            row = sparse.csr_matrix(
-                (np.ones(len(seed_idxs), dtype=np.float64),
-                 (np.zeros(len(seed_idxs), dtype=np.int64), seed_idxs)),
-                shape=(1, self.num_tracks),
-            )
-            scores = np.asarray((row @ self.similarity).todense()).ravel()
+            return np.zeros(self.num_tracks, dtype=np.float64)
+        # Vetor-linha binário das músicas seed (1 × num_tracks)
+        row = sparse.csr_matrix(
+            (np.ones(len(seed_idxs), dtype=np.float64),
+             (np.zeros(len(seed_idxs), dtype=np.int64), seed_idxs)),
+            shape=(1, self.num_tracks),
+        )
+        return np.asarray((row @ self.similarity).todense()).ravel()
+
+    def recommend(self, pid_encoded, seed_idxs, exclude_idxs, top_k=500):
+        """
+        Top-k músicas a partir de `seed_idxs` (músicas conhecidas da playlist),
+        excluindo `exclude_idxs`. `pid_encoded` é IGNORADO (ver score()); a
+        interface é a mesma nos três modelos colaborativos.
+        """
+        scores = self.score(pid_encoded, seed_idxs)
 
         exclude_idxs = np.asarray(exclude_idxs, dtype=np.int64)
         if len(exclude_idxs) > 0:
