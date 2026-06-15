@@ -28,7 +28,7 @@
 # DECISÃO DE PROJETO — treino com `implicit`, inferência manual: a lib é usada
 # só para TREINAR (a parte pesada, em Cython); a inferência manual evita a
 # assinatura instável de model.recommend() entre versões do implicit e deixa
-# a matemática explícita (útil para o TCC).
+# a matemática explícita.
 #
 # USO:
 #   Treinar:   python model_collaborative_als.py   (ou via main.py)
@@ -83,8 +83,8 @@ class ALSRecommender:
     def load_or_train(cls, interactions_df, pid_map, track_map,
                       reverse_track_map=None, uri_to_name=None):
         """
-        Assinatura idêntica nos três modelos colaborativos (drop-in no main.py
-        e no compare_models.py). reverse_track_map e uri_to_name não
+        Assinatura idêntica nos três modelos colaborativos (mesma chamada no
+        main.py e no compare_models.py). reverse_track_map e uri_to_name não
         são usados aqui — nomes de músicas só importam no relatório do compare.
         """
         self = cls(interactions_df, pid_map, track_map)
@@ -148,8 +148,17 @@ class ALSRecommender:
         # versões antigas, implicit.als.AlternatingLeastSquares é a classe.
         try:
             from implicit.cpu.als import AlternatingLeastSquares
+            import implicit.cpu.als as _als_mod
         except ImportError:
             from implicit.als import AlternatingLeastSquares
+            import implicit.als as _als_mod
+        # Neutraliza o check_blas_config do implicit (chamado no __init__ ao
+        # carregar): é só um AVISO de performance, mas em alguns ambientes
+        # Windows o threadpoolctl crasha ao introspectar DLLs de threading
+        # (OSError 0xc06d007f). O BLAS já está fixado em 1 thread no topo do
+        # arquivo, então a verificação é dispensável aqui.
+        if hasattr(_als_mod, "check_blas_config"):
+            _als_mod.check_blas_config = lambda *a, **k: None
         self.model = AlternatingLeastSquares.load(MODEL_PATH)
         self._prepare_inference()
 
@@ -164,9 +173,9 @@ class ALSRecommender:
     # --------------------------------------------------------------------- #
     def score(self, pid_encoded, seed_idxs):
         """
-        Vetor de scores (num_tracks,) via fold-in a partir de `seed_idxs`, SEM
-        aplicar exclusões. Base comum de recommend() e do híbrido (late fusion).
-        `pid_encoded` é IGNORADO — a playlist é representada só pelas seeds.
+        Vetor de scores (num_tracks,) via fold-in a partir de `seed_idxs`, sem
+        aplicar exclusões. `pid_encoded` é IGNORADO — a playlist é representada
+        só pelas seeds.
         """
         Q = self.item_factors
         seed_idxs = np.asarray(seed_idxs, dtype=np.int64)

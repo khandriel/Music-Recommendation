@@ -246,8 +246,8 @@ class NeuMFRecommender:
     def load_or_train(cls, interactions_df, pid_map, track_map,
                       reverse_track_map=None, uri_to_name=None):
         """
-        Assinatura idêntica nos três modelos colaborativos (drop-in no main.py
-        e no compare_models.py). reverse_track_map e uri_to_name não
+        Assinatura idêntica nos três modelos colaborativos (mesma chamada no
+        main.py e no compare_models.py). reverse_track_map e uri_to_name não
         são usados aqui — nomes de músicas só importam no relatório do compare.
         """
         num_playlists = len(pid_map)
@@ -266,9 +266,9 @@ class NeuMFRecommender:
     def score(self, pid_encoded, seed_idxs=None):
         """
         Vetor de scores NeuMF (num_tracks,) para `pid_encoded` sobre todo o
-        catálogo, SEM aplicar exclusões. Base comum de recommend() e do híbrido
-        (late fusion). `seed_idxs` é IGNORADO — o NeuMF representa a playlist
-        pelo embedding aprendido no treino (id da playlist), não pelas seeds.
+        catálogo, sem aplicar exclusões. `seed_idxs` é IGNORADO — o NeuMF
+        representa a playlist pelo embedding aprendido no treino (id da
+        playlist), não pelas seeds.
         """
         all_track_idxs = np.arange(self.num_tracks)
         return self.model.predict(

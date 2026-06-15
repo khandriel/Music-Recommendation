@@ -1,116 +1,181 @@
 # Sistema de Recomendação de Músicas (TCC)
 
-Comparação de abordagens de recomendação de músicas para playlists usando o
-dataset **Spotify Million Playlist**. O projeto implementa três modelos sob uma
-interface comum:
+Estudo comparativo de abordagens de recomendação para **continuação de playlists**
+(*playlist continuation*) sobre o dataset **Spotify Million Playlist**. Dada uma
+playlist com parte das faixas, cada modelo tenta prever as faixas removidas.
 
-| Modelo | Arquivo | Status | Ideia |
-|---|---|---|---|
-| **Colaborativo** | [`model_collaborative.py`](model_collaborative.py) | Completo | Rede neural NeuMF (GMF + MLP) que aprende co-ocorrências playlist↔música |
-| **Content-based** | [`model_content.py`](model_content.py) | Completo | TF-IDF (nome + artista) + similaridade de cosseno |
-| **Híbrido** | [`model_hybrid.py`](model_hybrid.py) | Parcial | Estrutura pronta; combina os dois sinais (colaborativo ainda a integrar) |
+**Autores:** Arthur Real Sanchotene Ferreira e Osmar Sadi Nether Filho
+**Orientador:** Luan Garcia
+
+---
+
+## Modelos comparados
+
+Todos expõem a mesma interface (`load_or_train(...)` + `recommend(pid, seed_idxs, exclude_idxs, top_k)`):
+
+| Modelo | Arquivo | Ideia |
+|---|---|---|
+| **Item-kNN** | [`model_collaborative_itemknn.py`](model_collaborative_itemknn.py) | Similaridade item-item por co-ocorrência em playlists (cosseno podado nos K vizinhos) |
+| **ALS** | [`model_collaborative_als.py`](model_collaborative_als.py) | Matrix Factorization implícita (fatores latentes), com *fold-in* na inferência |
+| **NeuMF** | [`model_collaborative_neumf.py`](model_collaborative_neumf.py) | Rede neural (GMF + MLP) que aprende a relação playlist↔música |
+| **Content-Based** | [`model_content.py`](model_content.py) | Conteúdo da faixa (áudio, gênero, ano, artista, país); perfil-centroide da playlist |
+| **Híbrido (late fusion)** | [`model_hybrid.py`](model_hybrid.py) | Combina os scores normalizados de um colaborativo + content (peso `ALPHA`) |
+
+Os três colaborativos são arquivos **autocontidos** (cada um só treina + recomenda);
+toda a avaliação fica centralizada no [`compare_models.py`](compare_models.py).
+
+## Resultados de referência
+
+Execução com `N_FILES=350` (350 mil playlists, ~1,34M músicas), 500 playlists de
+teste, 20% das faixas removidas, `Top-500`, `seed=42` — números completos em
+`comparison_report.txt`:
+
+| Modelo | Recall@500 (micro) | NDCG@500 |
+|---|---:|---:|
+| Item-kNN | **65,8%** | 0,402 |
+| ALS | 51,9% | 0,261 |
+| NeuMF | 29,6% | 0,108 |
+| Híbrido NeuMF+Content (α=0,5) | 23,0% | 0,092 |
+| Content-Based (pesos afinados) | ~16,6% | ~0,077 |
 
 ---
 
 ## 1. Pré-requisitos
 
-- **Python 3.10**
-- **(Opcional) GPU NVIDIA** com CUDA 12.x — acelera muito o treino do colaborativo
-- Conexão com a internet na primeira execução (download do dataset via `kagglehub`)
+- **Python 3.10** (ambiente testado: conda `tcc`).
+- Internet na primeira execução (o `kagglehub` baixa o dataset automaticamente).
+- **(Opcional) GPU NVIDIA** para acelerar o NeuMF — ver seção GPU.
+- Para o **Content-Based**, dois arquivos na raiz do projeto:
+  - `audio_features.csv` — features de áudio por faixa (grande, **não versionado**).
+  - `generos.json` — mapa `{artista: [gêneros]}` (já incluído no repositório).
 
-> O `kagglehub` baixa o dataset automaticamente. Se for solicitado login, crie
-> uma conta gratuita em [kaggle.com](https://www.kaggle.com) e gere um token em
-> *Account → Create New API Token* (gera um `kaggle.json`).
+> O `kagglehub` baixa o dataset sozinho. Se for pedido login, crie uma conta
+> gratuita em [kaggle.com](https://www.kaggle.com) e gere um token em
+> *Account → Create New API Token*.
 
 ## 2. Instalação
 
 ```bash
-# (recomendado) criar um ambiente virtual
-python -m venv .venv
-.venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # Linux/macOS
+# (recomendado) criar um ambiente isolado
+conda create -n tcc python=3.10
+conda activate tcc
 
 # instalar dependências
 pip install -r requirements.txt
 ```
 
-Para instalação **somente CPU** (sem GPU), edite o `requirements.txt` antes:
-comente a linha `tensorflow[and-cuda]==2.21.0` e descomente `tensorflow==2.21.0`.
+> **numpy < 2 é obrigatório:** o `tensorflow==2.10.0` não funciona com numpy 2.x
+> (o `requirements.txt` já fixa `numpy==1.26.4`).
+
+### GPU (opcional)
+
+O TensorFlow 2.10 é a última versão com suporte nativo a GPU no Windows. Para
+usar a GPU, instale à parte **CUDA 11.2 + cuDNN 8.1** (não vêm via pip nesta
+versão). Sem isso, o NeuMF treina/infere em **CPU** normalmente (apenas mais lento).
 
 ## 3. Como rodar
 
-Toda a configuração fica no topo do [`main.py`](main.py):
+O fluxo tem duas etapas: **treinar** os modelos e depois **comparar**.
+
+### 3.1. Treinar — [`main.py`](main.py)
+
+Escolha o que treinar nas flags do topo do arquivo e rode. Os modelos rodam
+**um de cada vez** (sequencial — pensado para máquinas com RAM limitada); um
+modelo já salvo em `saved_models/` é apenas carregado, não retreinado.
 
 ```python
-MODEL   = "collaborative"  # "collaborative" | "content" | "hybrid"
-N_FILES = 300              # nº de arquivos JSON (cada arquivo = 1000 playlists)
-```
+TRAIN_ALS     = False   # Matrix Factorization implícita (leve)
+TRAIN_ITEMKNN = False   # Item-item kNN por co-ocorrência (leve)
+TRAIN_CONTENT = False   # Content-Based (a partir do audio_features.csv)
+TRAIN_NEUMF   = False   # Rede neural NeuMF (PESADO — fica por último)
+TRAIN_HYBRID  = False   # Híbrido NeuMF+Content (compõe; treina o que faltar)
 
-Depois execute:
+N_FILES = 350           # arquivos JSON do dataset (cada um = 1000 playlists)
+```
 
 ```bash
 python main.py
 ```
 
-- **Escolher o modelo:** altere `MODEL`.
-- **Mais/menos dados:** altere `N_FILES` (ex.: `1000` = 1 milhão de playlists).
-- **Conteúdo standalone:** `MODEL = "content"` ainda é um placeholder
-  (lança `NotImplementedError`); use `python model_content.py` para rodá-lo.
+### 3.2. Comparar — [`compare_models.py`](compare_models.py)
 
-### Rodar um módulo isoladamente
-
-Cada arquivo também roda sozinho (útil para depurar):
+Avalia **todos** os modelos disponíveis em `saved_models/` sobre o mesmo
+conjunto de teste e grava o relatório. Não treina nada (modelos ausentes são
+pulados).
 
 ```bash
-python data_processing.py      # carrega e inspeciona os dados (não salva cache)
-python model_content.py        # processa, salva o cache e avalia o content-based
-python model_collaborative.py  # treina/carrega e avalia o colaborativo
+python compare_models.py        # gera comparison_report.txt
 ```
 
-> Na execução standalone, o `N_FILES` usado é o definido em
-> [`data_processing.py`](data_processing.py), **não** o do `main.py`.
+Parâmetros no topo do arquivo: `N_FILES`, `NUM_PLAYLISTS_TEST` (500),
+`PCT_REMOVED` (0,20), `TOP_K` (500), `SEED` (42), `SHOW_DETAILS`.
 
-## 4. O que é gerado
+### 3.3. Rodar um modelo isolado
 
-| Pasta | Conteúdo | Quem cria |
+Cada arquivo de modelo também roda sozinho (treina/carrega):
+
+```bash
+python model_collaborative_itemknn.py
+python model_content.py
+```
+
+## 4. Ferramentas de análise (opcionais)
+
+Scripts de medição — não fazem parte do pipeline, só imprimem tabelas no console
+(não escrevem arquivos nem alteram modelos):
+
+- [`sweep_hybrid_alpha.py`](sweep_hybrid_alpha.py) — varre o peso `ALPHA` do
+  híbrido (0,0 → 1,0) e mostra Recall/NDCG em cada valor.
+- [`sweep_pesos_content.py`](sweep_pesos_content.py) — varre os pesos das
+  features do content (artista/gênero/ano) para afinar o `PESOS_DEFAULT`.
+
+## 5. O que é gerado
+
+| Caminho | Conteúdo | Quem cria |
 |---|---|---|
-| `cache/` | Dados pré-processados (TF-IDF, DataFrames, mapeamentos) | `model_content.save_cache()` |
-| `saved_models/` | Rede colaborativa treinada (`collaborative_model.keras`) | `model_collaborative.save_model()` |
+| `cache/interactions_cache.joblib` | Interações pré-processadas + mapeamentos | `data_processing.py` |
+| `saved_models/collaborative_als.npz` | ALS treinado | `main.py` (ou o próprio modelo) |
+| `saved_models/collaborative_itemknn.npz` | Item-kNN treinado | idem |
+| `saved_models/collaborative_neumf.keras` | NeuMF treinado | idem |
+| `saved_models/content_based.joblib` | Catálogo do content (áudio/gênero/ano) | idem |
+| `comparison_report.txt` | Relatório da comparação | `compare_models.py` |
 
-**Lógica de reuso:** se a pasta existe, o código **carrega** em vez de
-reprocessar/retreinar. Para forçar do zero:
+> O híbrido **não** tem arquivo próprio — ele compõe o NeuMF e o content já salvos.
+
+### Forçar reprocessamento/retreino
 
 | Objetivo | Apague |
 |---|---|
-| Retreinar o colaborativo | `saved_models/collaborative_model.keras` |
+| Retreinar um modelo | o arquivo correspondente em `saved_models/` |
 | Reprocessar os dados | `cache/` |
-| **Trocar `N_FILES`** | `cache/` **e** `saved_models/` |
 
-> O `cache/` **não guarda** o valor de `N_FILES`. Se você mudar `N_FILES`
-> sem apagar o `cache/`, o programa usará os dados antigos silenciosamente.
+> O cache registra o `N_FILES` usado: se você mudar `N_FILES`, ele é invalidado
+> e os dados são reprocessados **automaticamente** (não precisa apagar à mão).
 
-## 5. Como funciona a avaliação
+## 6. Como funciona a avaliação
 
-Para cada playlist de teste, o sistema **remove uma fração** (`PCT_REMOVED`, 20%
-por padrão) das músicas, pede ao modelo para recomendar, e mede quantas das
-removidas reaparecem no **Top K** (métrica **Recall@K**). A semente (`SEED`)
-fixa quais músicas são removidas, então diferentes modelos são comparados sobre
-o **mesmo** conjunto — comparação justa.
+Para cada playlist de teste, remove-se `PCT_REMOVED` (20%) das faixas, pede-se o
+`Top-K` ao modelo a partir das faixas restantes e mede-se quantas das removidas
+reaparecem. A `SEED` fixa quais playlists entram e quais faixas são removidas —
+**o mesmo conjunto para todos os modelos** (comparação justa). Métricas:
+Recall@K (micro e macro), Precision@K, F1@K e NDCG@K.
 
-Parâmetros de avaliação ficam no topo da seção correspondente de cada modelo
-(ex.: `NUM_PLAYLISTS_TEST`, `PCT_REMOVED`, `TOP_K_REC` em
-[`model_collaborative.py`](model_collaborative.py)).
-
-## 6. Estrutura do projeto
+## 7. Estrutura do projeto
 
 ```
 .
-├── main.py                  # ponto de entrada — seleciona e roda um modelo
-├── data_processing.py       # download + pré-processamento (compartilhado)
-├── model_collaborative.py   # modelo colaborativo (NeuMF) — baseline
-├── model_content.py         # modelo content-based (TF-IDF)
-├── model_hybrid.py          # modelo híbrido (estrutura)
-├── requirements.txt         # dependências
-├── cache/                   # (gerado) dados pré-processados
-└── saved_models/            # (gerado) rede treinada
+├── main.py                          # treino (seleção por flags, sequencial)
+├── compare_models.py                # avaliação + relatório (todos os modelos)
+├── data_processing.py               # download + pré-processamento + cache
+├── model_collaborative_neumf.py     # NeuMF (rede neural)
+├── model_collaborative_als.py       # ALS (matrix factorization)
+├── model_collaborative_itemknn.py   # item-item kNN
+├── model_content.py                 # content-based (áudio/gênero/ano/artista)
+├── model_hybrid.py                  # híbrido (late fusion)
+├── sweep_hybrid_alpha.py            # análise: varredura do ALPHA do híbrido
+├── sweep_pesos_content.py           # análise: varredura dos pesos do content
+├── generos.json                     # {artista: [gêneros]} (para o content)
+├── requirements.txt                 # dependências
+├── cache/                           # (gerado) dados pré-processados
+└── saved_models/                    # (gerado) modelos treinados
 ```

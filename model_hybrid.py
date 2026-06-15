@@ -1,41 +1,28 @@
 # =============================================================================
-# model_hybrid.py — Recomendador HÍBRIDO por fusão de scores (late fusion)
+# model_hybrid.py — Recomendador híbrido por fusão de scores (late fusion)
 #
-# Combina UM modelo colaborativo (NeuMF, ALS ou Item-kNN) com o Content-Based,
-# sem retreinar nada: compõe dois modelos JÁ salvos em saved_models/. Mantém o
-# MESMO contrato dos demais (recommend(pid, seed_idxs, exclude_idxs, top_k)),
-# então é drop-in no compare_models.py.
+# Combina um modelo colaborativo (NeuMF, ALS ou Item-kNN) com o Content-Based,
+# sem retreinar: compõe dois modelos já salvos em saved_models/. Expõe o mesmo
+# recommend(pid, seed_idxs, exclude_idxs, top_k) dos demais modelos.
 #
-# (SUBSTITUI a versão antiga deste arquivo — early fusion via "soft labels"/
-# augmentation do treino do NeuMF —, que dependia do antigo model_collaborative
-# e de load_dataset/build_interactions. Aquele histórico está no git.)
-#
-# COMO FUNCIONA (late fusion / "weighted hybrid" de Burke):
-#   1. Pede a CADA modelo o vetor de scores brutos sobre o catálogo inteiro
-#      (o método score() que cada modelo passou a expor).
-#   2. Exclui as faixas já conhecidas (seeds) ANTES de normalizar — assim o
-#      min-max cobre só as candidatas e as seeds (score alto) não comprimem a
-#      escala.
-#   3. Normaliza cada vetor para [0,1] por min-max (escalas diferentes: NeuMF
+# Fusão (weighted hybrid):
+#   1. Obtém de cada modelo o vetor de scores sobre o catálogo (score()).
+#   2. Exclui as faixas já conhecidas (seeds) antes de normalizar, para o
+#      min-max cobrir só as candidatas.
+#   3. Normaliza cada vetor para [0,1] por min-max (as escalas diferem: NeuMF
 #      é sigmoide, ALS é produto escalar, kNN é soma de similaridades, content
-#      é soma ponderada — sem normalizar, um dominaria o outro à toa).
-#   4. Combina por MÉDIA PONDERADA com peso ALPHA no colaborativo:
+#      é soma ponderada).
+#   4. Combina por média ponderada com peso ALPHA no colaborativo:
 #          score = alpha * colab_norm + (1-alpha) * content_norm
-#      mas SÓ sobre os modelos PRESENTES naquela faixa (o peso é renormalizado
-#      por faixa). Faixa sem features de áudio (content se abstém, -inf) usa só
-#      o colaborativo — não é penalizada por falta de cobertura do content.
-#      Modelo sem poder de discriminação (score constante) também se abstém.
+#      apenas sobre os modelos presentes na faixa (peso renormalizado por
+#      faixa): faixa sem cobertura do content usa só o colaborativo. Modelo com
+#      score constante (sem poder de discriminação) também se abstém.
 #
-# POR QUE ESTE PAR (NeuMF + Content) PRIMEIRO: é a junção do colaborativo mais
-# fraco com o content (fraco sozinho), para medir se um cobre a lacuna do outro
-# (cold-start de item e representação por seeds, que o NeuMF transdutivo não
-# tem). O resultado serve de base para extrapolar o ganho com ALS/kNN.
-#
-# CONFIG: troque COLAB_DEFAULT/ALPHA aqui, ou use HybridRecommender.build(
-# data, colab_key=..., alpha=...) para compor outro par no compare_models.py.
+# COLAB_DEFAULT/ALPHA definem o par e o peso; HybridRecommender.build(data,
+# colab_key=..., alpha=...) compõe um par específico.
 #
 # USO:
-#   Compor:    python model_hybrid.py          (garante os componentes treinados)
+#   Compor:    python model_hybrid.py
 #   Comparar:  python compare_models.py
 # =============================================================================
 
@@ -129,7 +116,7 @@ class HybridRecommender:
 
     @classmethod
     def load_or_train(cls, *data):
-        """Drop-in com os demais modelos (mesma assinatura). Compõe o par default."""
+        """Mesma assinatura dos demais modelos; compõe o par default."""
         return cls.build(data, COLAB_DEFAULT, ALPHA)
 
     # --------------------------------------------------------------------- #

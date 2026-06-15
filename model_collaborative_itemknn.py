@@ -77,8 +77,8 @@ class ItemKNNRecommender:
     def load_or_train(cls, interactions_df, pid_map, track_map,
                       reverse_track_map=None, uri_to_name=None):
         """
-        Assinatura idêntica nos três modelos colaborativos (drop-in no main.py
-        e no compare_models.py). reverse_track_map e uri_to_name não
+        Assinatura idêntica nos três modelos colaborativos (mesma chamada no
+        main.py e no compare_models.py). reverse_track_map e uri_to_name não
         são usados aqui — nomes de músicas só importam no relatório do compare.
         """
         self = cls(interactions_df, pid_map, track_map)
@@ -135,9 +135,8 @@ class ItemKNNRecommender:
     def score(self, pid_encoded, seed_idxs):
         """
         Vetor de scores (num_tracks,) somando a similaridade das músicas em
-        `seed_idxs` a todas as candidatas, SEM aplicar exclusões. Base comum de
-        recommend() e do híbrido (late fusion). `pid_encoded` é IGNORADO — a
-        playlist é representada apenas pelas músicas seed.
+        `seed_idxs` a todas as candidatas, sem aplicar exclusões. `pid_encoded`
+        é IGNORADO — a playlist é representada apenas pelas músicas seed.
         """
         seed_idxs = np.asarray(seed_idxs, dtype=np.int64)
         if len(seed_idxs) == 0:

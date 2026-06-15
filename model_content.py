@@ -7,7 +7,7 @@
 #     ContentRecommender.load_or_train(interactions_df, pid_map, track_map,
 #                                      reverse_track_map, uri_to_name)
 #
-# para ser drop-in na main.py (treino) e no compare_models.py (avaliação).
+# para uso direto na main.py (treino) e no compare_models.py (avaliação).
 #
 # PURO content-based: NÃO usa co-ocorrência em playlists nem qualquer sinal
 # colaborativo. A recomendação vem só do CONTEÚDO da faixa (features de áudio,
@@ -87,9 +87,11 @@ CSV_CHUNK    = 200_000   # leitura em blocos: poupa RAM no CSV de ~390MB
 MODELS_DIR = "saved_models"
 MODEL_PATH = os.path.join(MODELS_DIR, "content_based.joblib")
 
-# Pesos default da soma ponderada de scores (não precisam somar 1). São os três
-# sinais de conteúdo dominantes; áudio pesa mais, gênero e ano complementam.
-PESOS_DEFAULT = {'audio': 0.70, 'genero': 0.20, 'ano': 0.10}
+# Pesos da soma ponderada de scores (não precisam somar 1; normalizados
+# internamente). O artista domina o sinal de co-ocorrência em playlist; gênero e
+# ano entram com peso pequeno como complemento/desempate. Os sinais disponíveis
+# estão em score_funcs.
+PESOS_DEFAULT = {'artista': 0.90, 'genero': 0.05, 'ano': 0.05}
 
 
 def model_exists() -> bool:
@@ -147,6 +149,13 @@ class ContentRecommender:
 
         self.uri_to_cidx = {u: i for i, u in enumerate(self.uris)}
 
+        # Códigos inteiros das features categóricas — usados no perfil-centroide
+        # (cada faixa recebe como score a FRAÇÃO das seeds que compartilham sua
+        # categoria). Computados aqui (não salvos): dependem só do df carregado.
+        self.artist_codes, self._n_artist = self._codificar(self.artistas)
+        self.pais_codes,   self._n_pais   = self._codificar(self.paises)
+        self.era_codes,    self._n_era    = self._codificar(self.eras)
+
         self.score_funcs = {
             'audio':   self.score_audio,
             'genero':  self.score_genero,
@@ -183,8 +192,8 @@ class ContentRecommender:
     def load_or_train(cls, interactions_df=None, pid_map=None, track_map=None,
                       reverse_track_map=None, uri_to_name=None):
         """
-        Assinatura idêntica aos modelos colaborativos (drop-in na main.py e no
-        compare_models.py). interactions_df, pid_map e uri_to_name NÃO são usados
+        Assinatura idêntica aos modelos colaborativos (mesma chamada na main.py
+        e no compare_models.py). interactions_df, pid_map e uri_to_name NÃO são usados
         (o content treina a partir do CSV); track_map/reverse_track_map só
         servem à ponte usada pelo recommend() colaborativo.
         """
@@ -361,21 +370,36 @@ class ContentRecommender:
         return resultado.reset_index(drop=True)
 
     # --------------------------------------------------------------------- #
-    # INFERÊNCIA COLABORATIVA-COMPATÍVEL — mesma assinatura dos colaborativos
-    # (drop-in p/ compare_models). PURO content-based: a playlist é o
-    # PERFIL-CENTROIDE das faixas conhecidas (média do áudio/gênero + ano médio)
-    # e o catálogo é ranqueado por similaridade de conteúdo a esse perfil.
-    # Ponte via URI: faixas sem áudio (fora do CSV) não entram no ranking.
+    # INFERÊNCIA COLABORATIVA-COMPATÍVEL — mesma assinatura dos colaborativos.
+    # PURO content-based: a playlist é o
+    # PERFIL-CENTROIDE das faixas conhecidas (perfil de gênero/ano + frequência
+    # de artista/país, conforme os pesos) e o catálogo é ranqueado por
+    # similaridade a esse perfil. Ponte via URI: faixas fora do CSV de conteúdo
+    # não entram no ranking.
     # --------------------------------------------------------------------- #
+    @staticmethod
+    def _codificar(valores):
+        """Categórico -> códigos inteiros 0..k-1 (NaN vira 'nan', sem -1)."""
+        codes, uniq = pd.factorize(pd.Series(valores).astype(str))
+        return codes.astype(np.int64), len(uniq)
+
+    def _freq_perfil(self, codes: np.ndarray, n_codes: int,
+                     cidx: np.ndarray) -> np.ndarray:
+        """Perfil de frequência categórico: score (N,) = fração das seeds que
+        compartilham a categoria de cada faixa do catálogo (em [0, 1])."""
+        freq = np.bincount(codes[cidx], minlength=n_codes).astype(np.float32) / len(cidx)
+        return freq[codes]
+
     def _centroid_scores(self, cidx: np.ndarray, pesos: dict) -> np.ndarray:
         """Score de conteúdo (N,) do catálogo contra o centroide das faixas cidx."""
         score = np.zeros(self.N, dtype=np.float32)
         if len(cidx) == 0:
             return score
-        # No perfil-centroide só os sinais vetorizáveis fazem sentido (áudio,
-        # gênero, ano); pesos de era/país/artista são ignorados aqui.
+        # Sinais suportados no perfil-centroide: vetoriais (áudio, gênero), ano
+        # (kernel gaussiano em torno do ano médio) e categóricos (artista, país,
+        # era) via perfil de frequência. Pesos de sinais não listados são 0.
         usados = {f: w for f, w in pesos.items()
-                  if w > 0 and f in ('audio', 'genero', 'ano')}
+                  if w > 0 and f in ('audio', 'genero', 'ano', 'artista', 'pais', 'era')}
         total = sum(usados.values()) or 1.0
 
         if 'audio' in usados:
@@ -395,15 +419,25 @@ class ContentRecommender:
             s = np.exp(-0.5 * ((self.anos - ano_med) / SIGMA_ANO) ** 2).astype(np.float32)
             score += (usados['ano'] / total) * s
 
+        if 'artista' in usados:
+            s = self._freq_perfil(self.artist_codes, self._n_artist, cidx)
+            score += (usados['artista'] / total) * s
+
+        if 'pais' in usados:
+            s = self._freq_perfil(self.pais_codes, self._n_pais, cidx)
+            score += (usados['pais'] / total) * s
+
+        if 'era' in usados:
+            s = self._freq_perfil(self.era_codes, self._n_era, cidx)
+            score += (usados['era'] / total) * s
+
         return score
 
     def score(self, pid_encoded, seed_idxs, pesos: dict = None):
         """
         Vetor de scores de conteúdo (num_tracks,) do catálogo contra o perfil-
-        centroide das seeds, no espaço colaborativo (track_encoded), SEM aplicar
-        exclusões. Base comum de recommend() e do híbrido (late fusion). Faixas
-        sem features de áudio (fora do CSV) ficam -inf: o conteúdo se ABSTÉM
-        delas — o híbrido trata isso usando só o colaborativo nessas faixas.
+        centroide das seeds, no espaço colaborativo (track_encoded), sem aplicar
+        exclusões. Faixas sem features de áudio (fora do CSV) ficam -inf.
         """
         if self.track_map is None or self.reverse_track_map is None:
             raise RuntimeError(

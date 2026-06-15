@@ -1,37 +1,14 @@
-# =============================================================================
-# requirements.txt — Dependências do projeto
-#
-# As versões abaixo são as EFETIVAMENTE testadas no ambiente do TCC (conda
-# "tcc", Python 3.10). Estão fixadas para garantir reprodutibilidade.
-#
-# RESTRIÇÃO CRÍTICA: o TensorFlow 2.10 foi compilado para numpy 1.x. Manter
-# numpy < 2 — com numpy >= 2 o import do TF quebra (DLL/_multiarray_umath).
-#
-# INSTALAÇÃO:
-#   pip install -r requirements.txt
-#
-# GPU: o TensorFlow 2.10 é a última versão com suporte nativo a GPU no Windows.
-#   Para usar a GPU, instale à parte CUDA 11.2 + cuDNN 8.1 (não vêm via pip
-#   nesta versão). Sem isso, o treino roda em CPU normalmente.
-#
-# Passo a passo completo de execução: veja o README.md
-# =============================================================================
+# Dependências do projeto — ambiente testado: conda "tcc", Python 3.10.
+# Versões fixadas para reprodutibilidade. Instalação e notas de GPU: ver README.md.
+# IMPORTANTE: manter numpy < 2 — o TensorFlow 2.10 quebra com numpy >= 2.
 
-# --- Carregamento e pré-processamento de dados ---
-kagglehub==1.0.1     # download do dataset Spotify Million Playlist
-pandas==2.3.3        # manipulação dos DataFrames
-numpy==1.26.4        # operações numéricas / vetorização (NÃO subir para 2.x — ver acima)
-tqdm==4.67.3         # barra de progresso ao ler os JSONs
-
-# --- Modelo content-based e utilitários ---
-scikit-learn==1.7.2  # TF-IDF, train_test_split, similaridade de cosseno
-scipy==1.15.2        # matriz esparsa (save_npz/load_npz, álgebra esparsa)
-joblib==1.5.3        # serialização do cache (DataFrames, mapeamentos)
-
-# --- Modelos colaborativos clássicos esparsos ---
-# model_collaborative_als.py (ALS) e model_collaborative_itemknn.py (item-kNN)
-implicit==0.7.3      # ALS (Matrix Factorization) + item-item kNN por co-ocorrência
-
-# --- Deep Learning (modelo colaborativo NeuMF) ---
-tensorflow==2.10.0   # rede neural NeuMF (última versão com GPU nativa no Windows)
-keras==2.10.0        # API de alto nível usada para construir a rede
+kagglehub==1.0.1      # download do dataset Spotify Million Playlist
+pandas==2.3.3         # manipulação dos DataFrames
+numpy==1.26.4         # operações numéricas (NÃO subir para 2.x — ver README)
+tqdm==4.67.3          # barras de progresso
+scikit-learn==1.7.2   # StandardScaler, MultiLabelBinarizer, cosseno, train_test_split
+scipy==1.15.2         # matrizes esparsas (npz, álgebra esparsa)
+joblib==1.5.3         # serialização do cache e do modelo content
+implicit==0.7.3       # ALS (Matrix Factorization) + item-kNN por co-ocorrência
+tensorflow==2.10.0    # rede neural NeuMF (última versão com GPU nativa no Windows)
+keras==2.10.0         # API usada para construir a rede
