@@ -4,7 +4,7 @@
 #
 # ARQUIVO AUTOCONTIDO: este arquivo só TREINA o modelo e expõe a inferência
 # (recommend). A lógica de teste/avaliação — escolha das playlists, remoção
-# de músicas e métricas — vive em compare_collaborative.py, que usa o MESMO
+# de músicas e métricas — vive em compare_models.py, que usa o MESMO
 # conjunto de teste para todos os modelos (comparação justa).
 #
 # Modelo EXCLUSIVAMENTE colaborativo: aprende fatores latentes P (playlists×f)
@@ -32,7 +32,7 @@
 #
 # USO:
 #   Treinar:   python model_collaborative_als.py   (ou via main.py)
-#   Comparar:  python compare_collaborative.py
+#   Comparar:  python compare_models.py
 # =============================================================================
 
 import os
@@ -84,7 +84,7 @@ class ALSRecommender:
                       reverse_track_map=None, uri_to_name=None):
         """
         Assinatura idêntica nos três modelos colaborativos (drop-in no main.py
-        e no compare_collaborative.py). reverse_track_map e uri_to_name não
+        e no compare_models.py). reverse_track_map e uri_to_name não
         são usados aqui — nomes de músicas só importam no relatório do compare.
         """
         self = cls(interactions_df, pid_map, track_map)
@@ -191,10 +191,10 @@ class ALSRecommender:
 
 
 # =============================================================================
-# EXECUÇÃO DIRETA — apenas TREINA (avaliação: compare_collaborative.py)
+# EXECUÇÃO DIRETA — apenas TREINA (avaliação: compare_models.py)
 # =============================================================================
 
 if __name__ == "__main__":
     data = load_or_process_interactions()
     ALSRecommender.load_or_train(*data)
-    print("[ALS] Concluído. Para avaliar/comparar: python compare_collaborative.py")
+    print("[ALS] Concluído. Para avaliar/comparar: python compare_models.py")

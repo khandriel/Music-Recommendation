@@ -1,5 +1,5 @@
 # =============================================================================
-# main.py — Ponto de entrada de TREINO dos modelos colaborativos
+# main.py — Ponto de entrada de TREINO dos modelos de recomendação
 #
 # Escolha nas flags abaixo QUAIS modelos treinar. Os escolhidos rodam UM DE
 # CADA VEZ (sequencial — pensado para máquinas que não comportam mais de um
@@ -11,23 +11,23 @@
 #
 # A AVALIAÇÃO/COMPARAÇÃO não acontece aqui: toda a lógica de teste (escolha
 # das playlists, remoção de músicas, métricas, relatório) vive em
-# compare_collaborative.py.
+# compare_models.py.
 #
 # USO:
 #   Treinar:   python main.py
-#   Comparar:  python compare_collaborative.py
+#   Comparar:  python compare_models.py
 #
-# NOTA: o content-based (model_content.py) e o híbrido (model_hybrid.py)
-# estão DESATIVADOS por enquanto (dependem do model_content, fora do ar).
-# A fiação antiga deles está no histórico do git (main.py anterior).
+# NOTA: o content-based (model_content.py) já está integrado. O híbrido
+# (model_hybrid.py) ainda está DESATIVADO; sua fiação antiga está no git.
 # =============================================================================
 
 # =============================================================================
 # CONFIGURAÇÃO — escolha o que treinar
 # =============================================================================
-TRAIN_ALS     = True   # Matrix Factorization implícita (leve)
-TRAIN_ITEMKNN = True   # Item-item kNN por co-ocorrência (leve)
-TRAIN_NEUMF   = True   # Rede neural NeuMF (PESADO — fica por último)
+TRAIN_ALS     = False   # Matrix Factorization implícita (leve)
+TRAIN_ITEMKNN = False   # Item-item kNN por co-ocorrência (leve)
+TRAIN_CONTENT = False   # Content-Based puro (áudio+gênero+ano) a partir do CSV
+TRAIN_NEUMF   = False   # Rede neural NeuMF (PESADO — fica por último)
 
 N_FILES = 350          # Arquivos JSON do dataset (cada um = 1000 playlists)
 
@@ -62,6 +62,11 @@ def treinar_itemknn(data):
     ItemKNNRecommender.load_or_train(*data)
 
 
+def treinar_content(data):
+    from model_content import ContentRecommender
+    ContentRecommender.load_or_train(*data)
+
+
 def treinar_neumf(data):
     from model_collaborative_neumf import NeuMFRecommender
     NeuMFRecommender.load_or_train(*data)
@@ -71,9 +76,10 @@ def treinar_neumf(data):
 
 # Ordem: do mais leve ao mais pesado (NeuMF/TensorFlow por último)
 PLANO = [
-    ("ALS (Matrix Factorization)", TRAIN_ALS,     treinar_als),
-    ("Item-kNN (co-ocorrência)",   TRAIN_ITEMKNN, treinar_itemknn),
-    ("NeuMF (rede neural)",        TRAIN_NEUMF,   treinar_neumf),
+    ("ALS (Matrix Factorization)",       TRAIN_ALS,     treinar_als),
+    ("Item-kNN (co-ocorrência)",         TRAIN_ITEMKNN, treinar_itemknn),
+    ("Content-Based (áudio+gênero+ano)", TRAIN_CONTENT, treinar_content),
+    ("NeuMF (rede neural)",              TRAIN_NEUMF,   treinar_neumf),
 ]
 
 if __name__ == "__main__":
@@ -104,4 +110,4 @@ if __name__ == "__main__":
     for nome, status in resultados:
         print(f"  {nome:<30} {status}")
     print("=" * 64)
-    print("Para avaliar e comparar os modelos: python compare_collaborative.py")
+    print("Para avaliar e comparar os modelos: python compare_models.py")

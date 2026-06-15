@@ -5,6 +5,10 @@
 # Arquivo de dados brutos local
 data.txt
 
+# Features de áudio do content-based (~390MB — grande demais para o git;
+# mantenha o arquivo localmente na raiz do projeto)
+audio_features.csv
+
 # Modelo colaborativo treinado (pode ser retreinado com python main.py)
 saved_models/
 
@@ -12,7 +16,7 @@ saved_models/
 # Regenerado automaticamente ao rodar main.py ou model_content.py
 cache/
 
-# Relatório de comparação (gerado por compare_collaborative.py)
+# Relatório de comparação (gerado por compare_models.py)
 comparison_report.txt
 
 # =============================================================

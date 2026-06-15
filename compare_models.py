@@ -1,5 +1,5 @@
 # =============================================================================
-# compare_collaborative.py — Avaliação e comparação dos modelos colaborativos
+# compare_models.py — Avaliação e comparação dos modelos de recomendação
 #
 # Toda a LÓGICA DE TESTE vive aqui (os arquivos de modelo apenas treinam):
 #
@@ -13,14 +13,21 @@
 #   4. Calcula Recall@K (micro e macro), Precision@K, F1@K e NDCG@K e grava um
 #      relatório TXT com a configuração, o conjunto de teste e os resultados.
 #
+# MODELOS COMPARADOS:
+#   - ALS, Item-kNN, NeuMF  -> colaborativos (co-ocorrência em playlists)
+#   - Content-Based         -> PURO conteúdo (áudio + gênero + ano); NÃO usa
+#                              co-ocorrência. Só pontua faixas que têm features
+#                              de áudio (audio_features.csv); as demais ficam de
+#                              fora do ranking — a cobertura parcial é uma
+#                              característica honesta do modelo, não é corrigida.
+#   (o híbrido ainda fica de fora desta comparação.)
+#
 # FLAGS:
 #   SHOW_DETAILS — inclui no TXT as playlists escolhidas e as músicas removidas
 #                  de cada uma (o relatório fica grande; só vai para o arquivo,
 #                  não para o console).
 #
-# (content-based e híbrido ficam de fora desta comparação por enquanto.)
-#
-# USO: python compare_collaborative.py
+# USO: python compare_models.py
 # =============================================================================
 
 import os
@@ -58,8 +65,8 @@ MODELS_DIR = "saved_models"
 # =============================================================================
 # REGISTRO DOS MODELOS
 # Cada entrada: (nome, caminho do modelo salvo, fábrica que carrega o modelo).
-# O import fica dentro da fábrica: TensorFlow/implicit só carregam na vez do
-# respectivo modelo.
+# O import fica dentro da fábrica: TensorFlow/implicit/conteúdo só carregam na
+# vez do respectivo modelo.
 # =============================================================================
 
 def _make_als(data):
@@ -77,9 +84,15 @@ def _make_neumf(data):
     return NeuMFRecommender.load_or_train(*data)
 
 
+def _make_content(data):
+    from model_content import ContentRecommender
+    return ContentRecommender.load_or_train(*data)
+
+
 MODELS = [
     ("ALS (Matrix Factorization)", os.path.join(MODELS_DIR, "collaborative_als.npz"),     _make_als),
     ("Item-kNN (co-ocorrência)",   os.path.join(MODELS_DIR, "collaborative_itemknn.npz"), _make_itemknn),
+    ("Content-Based (áudio+gênero+ano)", os.path.join(MODELS_DIR, "content_based.joblib"), _make_content),
     ("NeuMF (rede neural)",        os.path.join(MODELS_DIR, "collaborative_neumf.keras"), _make_neumf),
 ]
 
@@ -190,7 +203,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------ #
     rep = []
     rep.append("=" * 70)
-    rep.append("COMPARAÇÃO DOS MODELOS COLABORATIVOS — RELATÓRIO")
+    rep.append("COMPARAÇÃO DOS MODELOS DE RECOMENDAÇÃO — RELATÓRIO")
     rep.append(f"Gerado em: {datetime.now():%Y-%m-%d %H:%M:%S}")
     rep.append("=" * 70)
     rep.append("")
@@ -285,26 +298,29 @@ if __name__ == "__main__":
     tab.append(f"  F1@{TOP_K}             : média harmônica de precision e recall")
     tab.append(f"  NDCG@{TOP_K}           : qualidade do ranking (acertos no topo valem mais)")
     tab.append("")
-    header = (f"{'Modelo':<30} {'Recall(mi)':>10} {'Recall(ma)':>10} "
+    header = (f"{'Modelo':<35} {'Recall(mi)':>10} {'Recall(ma)':>10} "
               f"{'Precision':>10} {'F1':>8} {'NDCG':>8} {'Tempo':>8}")
     tab.append(header)
     tab.append("-" * len(header))
     for nome, path, _ in MODELS:
         m = resultados.get(nome)
         if m is not None:
-            tab.append(f"{nome:<30} {m['recall_micro']:>10.2%} "
+            tab.append(f"{nome:<35} {m['recall_micro']:>10.2%} "
                        f"{m['recall_macro']:>10.2%} {m['precision']:>10.2%} "
                        f"{m['f1']:>8.2%} {m['ndcg']:>8.4f} "
                        f"{m['tempo_min']:>6.1f}m")
         elif nome in resultados:
-            tab.append(f"{nome:<30} FALHOU (ver console/traceback)")
+            tab.append(f"{nome:<35} FALHOU (ver console/traceback)")
         else:
-            tab.append(f"{nome:<30} não treinado — pulado")
+            tab.append(f"{nome:<35} não treinado — pulado")
     tab.append("=" * 70)
     tab.append("Obs.: o conjunto de teste é gerado uma única vez e reutilizado por")
     tab.append("todos os modelos (mesmas playlists, mesmas músicas removidas).")
     tab.append("NeuMF representa a playlist pelo embedding aprendido no treino;")
     tab.append("ALS e Item-kNN apenas pelas músicas restantes (fold-in).")
+    tab.append("Content-Based usa SÓ conteúdo (áudio+gênero+ano): a playlist vira")
+    tab.append("o perfil-centroide das restantes; faixas sem features de áudio não")
+    tab.append("entram no ranking (cobertura parcial, reportada como está).")
 
     rep.extend(tab)
     for linha in tab:
