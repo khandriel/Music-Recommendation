@@ -1,4 +1,4 @@
-# Dependências do projeto — ambiente testado: conda "tcc", Python 3.10.
+# Dependências do projeto — ambiente testado(anaconda usado como interpretador): conda "tcc", em Python 3.10.
 # Versões fixadas para reprodutibilidade. Instalação e notas de GPU: ver README.md.
 # IMPORTANTE: manter numpy < 2 — o TensorFlow 2.10 quebra com numpy >= 2.
 
