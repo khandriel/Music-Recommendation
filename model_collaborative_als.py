@@ -1,43 +1,34 @@
 # =============================================================================
-# model_collaborative_als.py — Filtragem Colaborativa pura via Matrix
-# Factorization implícita (Alternating Least Squares, Hu/Koren 2008)
+# model_collaborative_als.py — Colaborativo puro via Matrix Factorization implícita (Alternating
+# Least Squares, Hu/Koren 2008)
 #
-# ARQUIVO AUTOCONTIDO: este arquivo só TREINA o modelo e expõe a inferência
-# (recommend). A lógica de teste/avaliação — escolha das playlists, remoção
-# de músicas e métricas — vive em compare_models.py, que usa o MESMO
-# conjunto de teste para todos os modelos (comparação justa).
+# Aprende fatores latentes P (playlists×f) e Q (músicas×f) tais que P·Qᵀ aproxima a matriz esparsa de
+# interações playlist×música, ponderada pela confiança Cui = 1 + α·r. O score de uma música para uma
+# playlist é o produto escalar dos vetores latentes. Por operar sobre a matriz esparsa, é bem mais
+# leve em memória que o NeuMF.
 #
-# Modelo EXCLUSIVAMENTE colaborativo: aprende fatores latentes P (playlists×f)
-# e Q (músicas×f) tais que P·Qᵀ aproxima a matriz esparsa de interações
-# playlist×música, ponderada por confiança Cui = 1 + α·r. O score de uma
-# música para uma playlist é o produto escalar dos vetores latentes. Por
-# operar sobre a matriz esparsa, é MUITO mais leve em memória que o NeuMF.
-#
-# INFERÊNCIA (fold-in): na avaliação, a playlist de teste só "mostra" suas
-# músicas RESTANTES. O vetor latente u da playlist sai em forma fechada do
-# mesmo problema de mínimos quadrados que o ALS resolve por linha:
+# Inferência (fold-in): na avaliação a playlist de teste só mostra suas músicas restantes. O vetor
+# latente u sai em forma fechada do mesmo mínimos quadrados que o ALS resolve por linha:
 #
 #     u = (QᵀCQ + λI)⁻¹ Qᵀ C p
 #
 # Com Cui = 1 + α·r e preferência p = 1 nas restantes (0 caso contrário):
 #     QᵀCQ  = QᵀQ + α·Qrᵀ·Qr        (Qr = fatores das músicas restantes)
 #     QᵀC p = (1 + α)·Σ linhas de Qr
-# QᵀQ é pré-computado uma vez; o sistema é só f×f → resolução instantânea.
-# Os scores de todas as músicas são então Q·u.
+# QᵀQ é pré-computado uma vez; o sistema é só f×f → resolução instantânea. Os scores de todas as
+# músicas são então Q·u.
 #
-# DECISÃO DE PROJETO — treino com `implicit`, inferência manual: a lib é usada
-# só para TREINAR (a parte pesada, em Cython); a inferência manual evita a
-# assinatura instável de model.recommend() entre versões do implicit e deixa
-# a matemática explícita.
+# O `implicit` é usado só para TREINAR (parte pesada, em Cython); a inferência é manual, o que evita
+# a assinatura instável de model.recommend() entre versões e deixa a matemática explícita. A lógica
+# de teste/avaliação (mesmo conjunto de teste para todos os modelos) vive em compare_models.py.
 #
-# USO:
 #   Treinar:   python model_collaborative_als.py   (ou via main.py)
 #   Comparar:  python compare_models.py
 # =============================================================================
 
 import os
-# `implicit` paraleliza internamente; deixar o BLAS abrir o próprio threadpool
-# degrada a performance (oversubscription). Fixar ANTES de importar numpy.
+# `implicit` já paraleliza sozinho; deixar o BLAS abrir outro threadpool degrada a performance
+# (oversubscription). Fixar antes de importar numpy.
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 
@@ -80,13 +71,9 @@ class ALSRecommender:
     # FACTORY
     # --------------------------------------------------------------------- #
     @classmethod
-    def load_or_train(cls, interactions_df, pid_map, track_map,
-                      reverse_track_map=None, uri_to_name=None):
-        """
-        Assinatura idêntica nos três modelos colaborativos (mesma chamada no
-        main.py e no compare_models.py). reverse_track_map e uri_to_name não
-        são usados aqui — nomes de músicas só importam no relatório do compare.
-        """
+    def load_or_train(cls, interactions_df, pid_map, track_map, reverse_track_map=None, uri_to_name=None):
+        # Assinatura idêntica nos três colaborativos (mesma chamada em main.py e compare_models.py).
+        # reverse_track_map e uri_to_name não são usados aqui.
         self = cls(interactions_df, pid_map, track_map)
         if model_exists():
             print(f"[ALS] Modelo encontrado — carregando de '{MODEL_PATH}'...")
@@ -106,29 +93,21 @@ class ALSRecommender:
         rows = self.interactions_df['pid_encoded'].to_numpy()
         cols = self.interactions_df['track_encoded'].to_numpy()
         data = np.ones(len(rows), dtype=np.float32)
-        ui = sparse.csr_matrix(
-            (data, (rows, cols)),
-            shape=(self.num_playlists, self.num_tracks),
-        )
+        ui = sparse.csr_matrix((data, (rows, cols)), shape=(self.num_playlists, self.num_tracks))
         ui.data[:] = 1.0   # csr soma duplicatas → força tudo a binário
         return ui
 
     def train(self):
         from implicit.als import AlternatingLeastSquares
 
-        # A confiança é aplicada escalando a matriz por α ANTES do fit; assim
-        # a confiança efetiva vira Cui = 1 + α·r independentemente de a versão
-        # do implicit expor (ou não) o parâmetro `alpha` no construtor.
+        # A confiança é aplicada escalando a matriz por α antes do fit; assim a confiança efetiva
+        # vira Cui = 1 + α·r, independentemente de a versão do implicit expor (ou não) o parâmetro
+        # `alpha` no construtor.
         train_matrix = (self._build_user_items() * ALS_ALPHA).tocsr()
 
-        model = AlternatingLeastSquares(
-            factors=ALS_FACTORS,
-            regularization=ALS_REG,
-            iterations=ALS_ITERATIONS,
-            random_state=SEED,
-        )
-        print(f"[ALS] Treinando (factors={ALS_FACTORS}, alpha={ALS_ALPHA}, "
-              f"reg={ALS_REG}, iters={ALS_ITERATIONS})...")
+        model = AlternatingLeastSquares(factors=ALS_FACTORS, regularization=ALS_REG,
+                                        iterations=ALS_ITERATIONS, random_state=SEED)
+        print(f"[ALS] Treinando (factors={ALS_FACTORS}, alpha={ALS_ALPHA}, reg={ALS_REG}, iters={ALS_ITERATIONS})...")
         model.fit(train_matrix)
 
         self.model = model
@@ -142,21 +121,18 @@ class ALSRecommender:
         self.model.save(MODEL_PATH)
 
     def load(self):
-        # Nas versões recentes do implicit, implicit.als.AlternatingLeastSquares
-        # é uma FUNÇÃO-fábrica (escolhe implementação CPU ou GPU) e não tem
-        # .load() — a classe concreta com .load vive em implicit.cpu.als. Nas
-        # versões antigas, implicit.als.AlternatingLeastSquares é a classe.
+        # Nas versões recentes do implicit, implicit.als.AlternatingLeastSquares é uma função-fábrica
+        # (escolhe CPU ou GPU) e não tem .load() — a classe concreta com .load vive em
+        # implicit.cpu.als. Nas antigas, é a classe.
         try:
             from implicit.cpu.als import AlternatingLeastSquares
             import implicit.cpu.als as _als_mod
         except ImportError:
             from implicit.als import AlternatingLeastSquares
             import implicit.als as _als_mod
-        # Neutraliza o check_blas_config do implicit (chamado no __init__ ao
-        # carregar): é só um AVISO de performance, mas em alguns ambientes
-        # Windows o threadpoolctl crasha ao introspectar DLLs de threading
-        # (OSError 0xc06d007f). O BLAS já está fixado em 1 thread no topo do
-        # arquivo, então a verificação é dispensável aqui.
+        # Neutraliza o check_blas_config do implicit (chamado no __init__ ao carregar): é só um aviso
+        # de performance, mas em alguns ambientes Windows o threadpoolctl crasha ao introspectar DLLs
+        # de threading (OSError 0xc06d007f). O BLAS já está fixado em 1 thread no topo do arquivo.
         if hasattr(_als_mod, "check_blas_config"):
             _als_mod.check_blas_config = lambda *a, **k: None
         self.model = AlternatingLeastSquares.load(MODEL_PATH)
@@ -172,11 +148,8 @@ class ALSRecommender:
     # INFERÊNCIA
     # --------------------------------------------------------------------- #
     def score(self, pid_encoded, seed_idxs):
-        """
-        Vetor de scores (num_tracks,) via fold-in a partir de `seed_idxs`, sem
-        aplicar exclusões. `pid_encoded` é IGNORADO — a playlist é representada
-        só pelas seeds.
-        """
+        # Vetor de scores (num_tracks,) via fold-in a partir de `seed_idxs`, sem exclusões.
+        # `pid_encoded` é ignorado — a playlist é só as seeds.
         Q = self.item_factors
         seed_idxs = np.asarray(seed_idxs, dtype=np.int64)
         if len(seed_idxs) == 0:
@@ -188,11 +161,8 @@ class ALSRecommender:
         return Q @ u                                        # (num_tracks,)
 
     def recommend(self, pid_encoded, seed_idxs, exclude_idxs, top_k=500):
-        """
-        Top-k músicas via fold-in a partir de `seed_idxs` (músicas conhecidas
-        da playlist), excluindo `exclude_idxs`. `pid_encoded` é IGNORADO (ver
-        score()); a interface é a mesma nos três modelos colaborativos.
-        """
+        # Top-k músicas via fold-in a partir de `seed_idxs`, excluindo `exclude_idxs`. `pid_encoded`
+        # é ignorado (ver score()).
         scores = self.score(pid_encoded, seed_idxs)
 
         exclude_idxs = np.asarray(exclude_idxs, dtype=np.int64)

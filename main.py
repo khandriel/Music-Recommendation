@@ -1,46 +1,29 @@
 # =============================================================================
-# main.py — Ponto de entrada de TREINO dos modelos de recomendação
+# main.py — ponto de entrada de TREINO dos modelos de recomendação
 #
-# Escolha nas flags abaixo QUAIS modelos treinar. Os escolhidos rodam UM DE
-# CADA VEZ (sequencial — pensado para máquinas que não comportam mais de um
-# modelo na memória). Para treinar todos, deixe todas as flags em True.
+# Ligue nas flags abaixo quais modelos treinar. Os escolhidos rodam um de cada vez (sequencial,
+# pensado para máquinas que não seguram vários modelos na memória ao mesmo tempo). Modelos já salvos
+# em saved_models/ são só carregados, não retreinados — para forçar o retreino, apague o arquivo
+# correspondente.
 #
-# Modelos já salvos em saved_models/ NÃO são retreinados — são apenas
-# carregados (a mensagem indica qual caso ocorreu). Para forçar o retreino,
-# apague o arquivo correspondente em saved_models/.
+# A avaliação/comparação NÃO acontece aqui — isso vive em compare_models.py.
 #
-# A AVALIAÇÃO/COMPARAÇÃO não acontece aqui: toda a lógica de teste (escolha
-# das playlists, remoção de músicas, métricas, relatório) vive em
-# compare_models.py.
-#
-# USO:
 #   Treinar:   python main.py
 #   Comparar:  python compare_models.py
-#
-# NOTA: o content-based (model_content.py) já está integrado. O híbrido
-# (model_hybrid.py) faz LATE FUSION (NeuMF+Content) — não treina nada próprio,
-# só garante que seus dois componentes existam (treina os que faltarem).
 # =============================================================================
 
-# =============================================================================
-# CONFIGURAÇÃO — escolha o que treinar
-# =============================================================================
+# Escolha o que treinar
 TRAIN_ALS     = False   # Matrix Factorization implícita (leve)
 TRAIN_ITEMKNN = False   # Item-item kNN por co-ocorrência (leve)
 TRAIN_CONTENT = False   # Content-Based puro (áudio+gênero+ano) a partir do CSV
 TRAIN_NEUMF   = False   # Rede neural NeuMF (PESADO — fica por último)
 TRAIN_HYBRID  = False   # Híbrido NeuMF+Content (compõe; treina o que faltar)
 
-N_FILES = 350          # Arquivos JSON do dataset (cada um = 1000 playlists)
-
-# =============================================================================
-# EXECUÇÃO
-# =============================================================================
+N_FILES = 350   # Arquivos JSON do dataset (cada um = 1000 playlists)
 
 import os
-# BLAS em 1 thread ANTES de qualquer import que carregue o numpy — evita
-# oversubscription com o paralelismo interno do implicit (mesmo ajuste feito
-# nos arquivos de modelo, repetido aqui porque o numpy entra antes deles).
+# BLAS em 1 thread antes de qualquer import que puxe o numpy, senão o implicit sofre
+# oversubscription. Os arquivos de modelo repetem esse ajuste.
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 
@@ -51,8 +34,8 @@ import traceback
 from data_processing import load_or_process_interactions
 
 
-# Os imports dos modelos ficam DENTRO das funções: TensorFlow/implicit só são
-# carregados na vez do respectivo modelo (não pesam na memória dos demais).
+# Os imports dos modelos ficam dentro das funções: TensorFlow/implicit só são carregados na vez do
+# respectivo modelo, sem pesar na memória dos demais.
 
 def treinar_als(data):
     from model_collaborative_als import ALSRecommender
@@ -77,8 +60,8 @@ def treinar_neumf(data):
 
 
 def treinar_hybrid(data):
-    # Late fusion: não treina nada próprio — compõe NeuMF + Content, treinando
-    # os componentes que ainda não existirem em saved_models/.
+    # Late fusion: não treina nada próprio — compõe NeuMF + Content, treinando os componentes que
+    # ainda não existirem em saved_models/.
     from model_hybrid import HybridRecommender
     HybridRecommender.load_or_train(*data)
     try:
@@ -88,8 +71,8 @@ def treinar_hybrid(data):
         pass
 
 
-# Ordem: do mais leve ao mais pesado (NeuMF/TensorFlow por último; híbrido
-# depois, pois reaproveita o NeuMF e o content já treinados).
+# Ordem do mais leve ao mais pesado: NeuMF/TensorFlow por último, e o híbrido depois dele, já que
+# reaproveita o NeuMF e o content treinados.
 PLANO = [
     ("ALS (Matrix Factorization)",       TRAIN_ALS,     treinar_als),
     ("Item-kNN (co-ocorrência)",         TRAIN_ITEMKNN, treinar_itemknn),

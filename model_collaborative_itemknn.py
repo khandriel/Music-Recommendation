@@ -1,41 +1,31 @@
 # =============================================================================
-# model_collaborative_itemknn.py — Filtragem Colaborativa pura via item-item
-# kNN por co-ocorrência
+# model_collaborative_itemknn.py — Colaborativo puro via item-item kNN por co-ocorrência
 #
-# ARQUIVO AUTOCONTIDO: este arquivo só TREINA o modelo e expõe a inferência
-# (recommend). A lógica de teste/avaliação — escolha das playlists, remoção
-# de músicas e métricas — vive em compare_models.py, que usa o MESMO
-# conjunto de teste para todos os modelos (comparação justa).
-#
-# Modelo EXCLUSIVAMENTE colaborativo e BASEADO EM MEMÓRIA (não-paramétrico):
-# para cada música, guarda os K vizinhos mais parecidos — similaridade do
-# cosseno entre as colunas da matriz playlist×música (músicas que co-ocorrem
-# nas mesmas playlists). Recomendar para uma playlist = somar a similaridade
-# de cada música restante a todas as candidatas:
+# Modelo baseado em memória (não-paramétrico): para cada música guarda os K vizinhos mais parecidos
+# pela similaridade do cosseno entre as colunas da matriz playlist×música (músicas que co-ocorrem nas
+# mesmas playlists). Recomendar para uma playlist é somar a similaridade de cada música restante às
+# candidatas:
 #
 #     scores = (vetor binário das músicas restantes) · S
 #
-# onde S (músicas × músicas) é a matriz de similaridade podada nos top-K. Como
-# S é esparsa, o produto é um matvec esparso barato. A poda em K vizinhos
-# remove ruído de co-ocorrências fracas.
+# onde S (músicas × músicas) é a similaridade podada nos top-K. Como S é esparsa, o produto é um
+# matvec barato; a poda em K vizinhos remove co-ocorrências fracas.
 #
-# DIFERENÇA PARA O ALS: o kNN só liga músicas que REALMENTE co-ocorreram
-# (relação direta); o ALS, por aprender fatores latentes, capta relações
-# indiretas (músicas que combinam mesmo sem nunca terem aparecido juntas).
+# Diferença para o ALS: o kNN só liga músicas que REALMENTE co-ocorreram (relação direta); o ALS, por
+# aprender fatores latentes, capta relações indiretas (músicas que combinam mesmo sem nunca terem
+# aparecido juntas).
 #
-# DECISÃO DE PROJETO — treino com `implicit`, inferência manual: a lib é usada
-# só para calcular a matriz de similaridade (rápido, em Cython); o score é um
-# produto esparso feito à mão, sem depender da assinatura instável de
-# model.recommend() entre versões do implicit.
+# O `implicit` é usado só para calcular a matriz de similaridade (rápido, em Cython); o score é um
+# produto esparso feito à mão, sem depender da assinatura instável de model.recommend(). Avaliação:
+# compare_models.py.
 #
-# USO:
 #   Treinar:   python model_collaborative_itemknn.py   (ou via main.py)
 #   Comparar:  python compare_models.py
 # =============================================================================
 
 import os
-# `implicit` paraleliza internamente; deixar o BLAS abrir o próprio threadpool
-# degrada a performance (oversubscription). Fixar ANTES de importar numpy.
+# `implicit` já paraleliza sozinho; deixar o BLAS abrir outro threadpool degrada a performance
+# (oversubscription). Fixar antes de importar numpy.
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 
@@ -74,13 +64,9 @@ class ItemKNNRecommender:
     # FACTORY
     # --------------------------------------------------------------------- #
     @classmethod
-    def load_or_train(cls, interactions_df, pid_map, track_map,
-                      reverse_track_map=None, uri_to_name=None):
-        """
-        Assinatura idêntica nos três modelos colaborativos (mesma chamada no
-        main.py e no compare_models.py). reverse_track_map e uri_to_name não
-        são usados aqui — nomes de músicas só importam no relatório do compare.
-        """
+    def load_or_train(cls, interactions_df, pid_map, track_map, reverse_track_map=None, uri_to_name=None):
+        # Assinatura idêntica nos três colaborativos (mesma chamada em main.py e compare_models.py).
+        # reverse_track_map e uri_to_name não são usados aqui.
         self = cls(interactions_df, pid_map, track_map)
         if model_exists():
             print(f"[Item-kNN] Modelo encontrado — carregando de '{MODEL_PATH}'...")
@@ -100,10 +86,7 @@ class ItemKNNRecommender:
         rows = self.interactions_df['pid_encoded'].to_numpy()
         cols = self.interactions_df['track_encoded'].to_numpy()
         data = np.ones(len(rows), dtype=np.float32)
-        ui = sparse.csr_matrix(
-            (data, (rows, cols)),
-            shape=(self.num_playlists, self.num_tracks),
-        )
+        ui = sparse.csr_matrix((data, (rows, cols)), shape=(self.num_playlists, self.num_tracks))
         ui.data[:] = 1.0   # csr soma duplicatas → força tudo a binário
         return ui
 
@@ -133,11 +116,8 @@ class ItemKNNRecommender:
     # INFERÊNCIA
     # --------------------------------------------------------------------- #
     def score(self, pid_encoded, seed_idxs):
-        """
-        Vetor de scores (num_tracks,) somando a similaridade das músicas em
-        `seed_idxs` a todas as candidatas, sem aplicar exclusões. `pid_encoded`
-        é IGNORADO — a playlist é representada apenas pelas músicas seed.
-        """
+        # Vetor de scores (num_tracks,) somando a similaridade das músicas em `seed_idxs` a todas as
+        # candidatas, sem exclusões. `pid_encoded` é ignorado — a playlist é representada só pelas seeds.
         seed_idxs = np.asarray(seed_idxs, dtype=np.int64)
         if len(seed_idxs) == 0:
             return np.zeros(self.num_tracks, dtype=np.float64)
@@ -145,16 +125,12 @@ class ItemKNNRecommender:
         row = sparse.csr_matrix(
             (np.ones(len(seed_idxs), dtype=np.float64),
              (np.zeros(len(seed_idxs), dtype=np.int64), seed_idxs)),
-            shape=(1, self.num_tracks),
-        )
+            shape=(1, self.num_tracks))
         return np.asarray((row @ self.similarity).todense()).ravel()
 
     def recommend(self, pid_encoded, seed_idxs, exclude_idxs, top_k=500):
-        """
-        Top-k músicas a partir de `seed_idxs` (músicas conhecidas da playlist),
-        excluindo `exclude_idxs`. `pid_encoded` é IGNORADO (ver score()); a
-        interface é a mesma nos três modelos colaborativos.
-        """
+        # Top-k músicas a partir de `seed_idxs`, excluindo `exclude_idxs`. `pid_encoded` é ignorado
+        # (ver score()).
         scores = self.score(pid_encoded, seed_idxs)
 
         exclude_idxs = np.asarray(exclude_idxs, dtype=np.int64)
