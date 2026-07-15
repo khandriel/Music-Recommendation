@@ -3,39 +3,36 @@
 #
 # Toda a LÓGICA DE TESTE vive aqui (os arquivos de modelo apenas treinam):
 #
-#   1. Gera, com SEED fixa, o conjunto de teste: QUAIS playlists são escolhidas
-#      e QUAIS músicas de cada uma são removidas. O conjunto é gerado UMA única
-#      vez e reutilizado por todos os modelos — comparação justa por construção.
-#   2. Verifica quais modelos existem em saved_models/ (este script NÃO treina
-#      nada: modelos ausentes são pulados — treine com main.py).
-#   3. Avalia cada modelo disponível, UM DE CADA VEZ (sequencial, liberando a
-#      memória entre eles). A falha de um não derruba os demais.
-#   4. Calcula Recall@K (micro e macro), Precision@K, F1@K e NDCG@K e grava um
-#      relatório TXT com a configuração, o conjunto de teste e os resultados.
+#   1. Gera, com SEED fixa, o conjunto de teste: QUAIS playlists são escolhidas e QUAIS músicas de
+#      cada uma são removidas. O conjunto é gerado UMA única vez e reutilizado por todos os modelos
+#      — comparação justa por construção.
+#   2. Verifica quais modelos existem em saved_models/ (este script NÃO treina nada: modelos
+#      ausentes são pulados — treine com main.py).
+#   3. Avalia cada modelo disponível, UM DE CADA VEZ (sequencial, liberando a memória entre eles).
+#      A falha de um não derruba os demais.
+#   4. Calcula Recall@K (micro e macro), Precision@K, F1@K e NDCG@K e grava um relatório TXT com a
+#      configuração, o conjunto de teste e os resultados.
 #
 # MODELOS COMPARADOS:
 #   - ALS, Item-kNN, NeuMF  -> colaborativos (co-ocorrência em playlists)
-#   - Content-Based         -> PURO conteúdo (áudio + gênero + ano); NÃO usa
-#                              co-ocorrência. Só pontua faixas que têm features
-#                              de áudio (audio_features.csv); as demais ficam de
-#                              fora do ranking — a cobertura parcial é uma
-#                              característica honesta do modelo, não é corrigida.
-#   - Híbrido NeuMF+Content -> late fusion (model_hybrid.py): combina os scores
-#                              normalizados do NeuMF e do content. Só aparece se
-#                              AMBOS os componentes estiverem treinados.
+#   - Content-Based         -> PURO conteúdo (áudio + gênero + ano); NÃO usa co-ocorrência. Só pontua
+#                              faixas que têm features de áudio (audio_features.csv); as demais ficam
+#                              de fora do ranking — a cobertura parcial é uma característica honesta do
+#                              modelo, não é corrigida.
+#   - Híbrido NeuMF+Content -> late fusion (model_hybrid.py): combina os scores normalizados do NeuMF
+#                              e do content. Só aparece se AMBOS os componentes estiverem treinados.
 #
 # FLAGS:
-#   SHOW_DETAILS — inclui no TXT as playlists escolhidas e as músicas removidas
-#                  de cada uma (o relatório fica grande; só vai para o arquivo,
-#                  não para o console).
+#   SHOW_DETAILS — inclui no TXT as playlists escolhidas e as músicas removidas de cada uma (o
+#                  relatório fica grande; só vai para o arquivo, não para o console).
 #
 # USO: python compare_models.py
 # =============================================================================
 
 import os
-# BLAS em 1 thread ANTES de qualquer import que carregue o numpy — evita
-# oversubscription com o paralelismo interno do implicit (mesmo ajuste feito
-# nos arquivos de modelo, repetido aqui porque o numpy entra antes deles).
+# BLAS em 1 thread ANTES de qualquer import que carregue o numpy — evita oversubscription com o
+# paralelismo interno do implicit (mesmo ajuste feito nos arquivos de modelo, repetido aqui porque o
+# numpy entra antes deles).
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 
@@ -66,9 +63,8 @@ MODELS_DIR = "saved_models"
 
 # =============================================================================
 # REGISTRO DOS MODELOS
-# Cada entrada: (nome, caminho do modelo salvo, fábrica que carrega o modelo).
-# O import fica dentro da fábrica: TensorFlow/implicit/conteúdo só carregam na
-# vez do respectivo modelo.
+# Cada entrada: (nome, caminho do modelo salvo, fábrica que carrega o modelo). O import fica dentro
+# da fábrica: TensorFlow/implicit/conteúdo só carregam na vez do respectivo modelo.
 # =============================================================================
 
 def _make_als(data):
@@ -96,8 +92,8 @@ def _make_hybrid_neumf(data):
     return HybridRecommender.build(data, colab_key="neumf")
 
 
-# O caminho de cada modelo pode ser uma str (1 arquivo) ou uma lista (o híbrido
-# compõe dois modelos salvos; só fica disponível se TODOS existirem).
+# O caminho de cada modelo pode ser uma str (1 arquivo) ou uma lista (o híbrido compõe dois modelos
+# salvos; só fica disponível se TODOS existirem).
 from model_hybrid import required_paths as _hybrid_paths
 
 MODELS = [
@@ -124,18 +120,17 @@ def _fmt_path(path) -> str:
 
 def build_test_cases(interactions_df, rng, num_playlists_test, pct_removed):
     """
-    Sorteia `num_playlists_test` playlists e, de cada uma, remove
-    `pct_removed` das músicas (no mínimo 1). Retorna uma lista de casos
-    (pid, removed, remaining), onde removed/remaining são arrays de
-    track_encoded. Como o conjunto é materializado aqui e reutilizado,
-    todos os modelos são avaliados sobre EXATAMENTE os mesmos dados.
+    Sorteia `num_playlists_test` playlists e, de cada uma, remove `pct_removed` das músicas (no
+    mínimo 1). Retorna uma lista de casos (pid, removed, remaining), onde removed/remaining são
+    arrays de track_encoded. Como o conjunto é materializado aqui e reutilizado, todos os modelos são
+    avaliados sobre EXATAMENTE os mesmos dados.
     """
     all_pids = interactions_df['pid'].unique()
     n_test   = min(num_playlists_test, len(all_pids))
     chosen   = rng.choice(all_pids, size=n_test, replace=False)
 
-    # Índice pid → tracks restrito às playlists sorteadas, em UMA passada
-    # (filtrar o DataFrame inteiro a cada playlist dominaria o tempo).
+    # Índice pid → tracks restrito às playlists sorteadas, em UMA passada (filtrar o DataFrame inteiro
+    # a cada playlist dominaria o tempo).
     sub = interactions_df[interactions_df['pid'].isin(set(chosen.tolist()))]
     tracks_by_pid = {pid: g.values for pid, g in sub.groupby('pid')['track_encoded']}
 
@@ -145,8 +140,7 @@ def build_test_cases(interactions_df, rng, num_playlists_test, pct_removed):
         n_rem       = max(1, int(len(tracks) * pct_removed))
         removed     = rng.choice(tracks, n_rem, replace=False)
         removed_set = set(removed.tolist())
-        remaining   = np.array(
-            [t for t in tracks if t not in removed_set], dtype=np.int64)
+        remaining   = np.array([t for t in tracks if t not in removed_set], dtype=np.int64)
         cases.append((int(pid), removed, remaining))
     return cases
 
@@ -156,22 +150,19 @@ def build_test_cases(interactions_df, rng, num_playlists_test, pct_removed):
 
 def evaluate_model(nome, rec, test_cases, pid_map, top_k):
     """
-    Para cada caso de teste, pede o Top-K ao modelo a partir das músicas
-    RESTANTES (excluindo-as do ranking) e mede quantas das REMOVIDAS foram
-    recuperadas. Retorna um dicionário de métricas:
+    Para cada caso de teste, pede o Top-K ao modelo a partir das músicas RESTANTES (excluindo-as do
+    ranking) e mede quantas das REMOVIDAS foram recuperadas. Retorna um dicionário de métricas:
 
       recall_micro — total de acertos / total de removidas (visão global)
       recall_macro — média do recall por playlist (cada playlist pesa igual)
       precision    — acertos / K, média por playlist
       f1           — média harmônica de precision e recall, média por playlist
-      ndcg         — qualidade do RANKING: acertos no topo valem mais
-                     (DCG/IDCG, média por playlist)
+      ndcg         — qualidade do RANKING: acertos no topo valem mais (DCG/IDCG, média por playlist)
     """
     recalls, precisions, f1s, ndcgs = [], [], [], []
     total_hits = total_removed = 0
 
-    for pid, removed, remaining in tqdm(test_cases, desc=f"Avaliando {nome}",
-                                        unit="pl"):
+    for pid, removed, remaining in tqdm(test_cases, desc=f"Avaliando {nome}", unit="pl"):
         removed_set = set(removed.tolist())
         top = rec.recommend(pid_map[pid], remaining, remaining, top_k)
 
@@ -180,8 +171,7 @@ def evaluate_model(nome, rec, test_cases, pid_map, top_k):
 
         recall    = h / n_rem
         precision = h / top_k
-        f1 = (2 * precision * recall / (precision + recall)
-              if (precision + recall) > 0 else 0.0)
+        f1 = (2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0)
         dcg  = float(np.sum(1.0 / np.log2(np.asarray(hit_ranks) + 1.0))) if hit_ranks else 0.0
         idcg = float(np.sum(1.0 / np.log2(np.arange(1, min(n_rem, top_k) + 1) + 1.0)))
 
@@ -213,11 +203,9 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------ #
     # 1. Conjunto de teste (uma única vez, com a SEED)
     # ------------------------------------------------------------------ #
-    print(f"\nGerando conjunto de teste (seed={SEED}, "
-          f"{NUM_PLAYLISTS_TEST} playlists, {PCT_REMOVED:.0%} removido)...")
+    print(f"\nGerando conjunto de teste (seed={SEED}, {NUM_PLAYLISTS_TEST} playlists, {PCT_REMOVED:.0%} removido)...")
     rng = np.random.default_rng(SEED)
-    test_cases = build_test_cases(interactions_df, rng,
-                                  NUM_PLAYLISTS_TEST, PCT_REMOVED)
+    test_cases = build_test_cases(interactions_df, rng, NUM_PLAYLISTS_TEST, PCT_REMOVED)
     total_removidas = sum(len(removed) for _, removed, _ in test_cases)
 
     # ------------------------------------------------------------------ #
@@ -249,8 +237,7 @@ if __name__ == "__main__":
             rep.append(f"  [OK]      {nome} — '{_fmt_path(path)}'")
             disponiveis.append((nome, factory))
         else:
-            rep.append(f"  [AUSENTE] {nome} — '{_fmt_path(path)}' não encontrado; "
-                       f"treine com main.py (modelo PULADO)")
+            rep.append(f"  [AUSENTE] {nome} — '{_fmt_path(path)}' não encontrado; treine com main.py (modelo PULADO)")
     rep.append("")
 
     for linha in rep:
@@ -259,20 +246,17 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------ #
     # 3. Conjunto de teste no relatório (detalhe controlado por flag)
     # ------------------------------------------------------------------ #
-    rep.append(f"CONJUNTO DE TESTE: {len(test_cases)} playlists | "
-               f"{total_removidas} músicas removidas no total")
+    rep.append(f"CONJUNTO DE TESTE: {len(test_cases)} playlists | {total_removidas} músicas removidas no total")
     if SHOW_DETAILS:
         rep.append("-" * 70)
         for pid, removed, remaining in test_cases:
-            rep.append(f"Playlist {pid} — {len(removed) + len(remaining)} músicas "
-                       f"({len(removed)} removidas, {len(remaining)} restantes)")
+            rep.append(f"Playlist {pid} — {len(removed) + len(remaining)} músicas ({len(removed)} removidas, {len(remaining)} restantes)")
             for idx in removed:
                 uri = reverse_track_map[int(idx)]
                 rep.append(f"    - {uri_to_name.get(uri, '?')}")
         rep.append("-" * 70)
     else:
-        rep.append("(playlists escolhidas e músicas removidas ocultas — "
-                   "use SHOW_DETAILS=True para incluí-las)")
+        rep.append("(playlists escolhidas e músicas removidas ocultas — use SHOW_DETAILS=True para incluí-las)")
     rep.append("")
 
     # ------------------------------------------------------------------ #
@@ -289,9 +273,7 @@ if __name__ == "__main__":
             metricas = evaluate_model(nome, rec, test_cases, pid_map, TOP_K)
             metricas['tempo_min'] = (time.time() - t0) / 60
             resultados[nome] = metricas
-            print(f"[{nome}] Recall@{TOP_K} (micro) = "
-                  f"{metricas['recall_micro']:.2%} | NDCG@{TOP_K} = "
-                  f"{metricas['ndcg']:.4f}")
+            print(f"[{nome}] Recall@{TOP_K} (micro) = {metricas['recall_micro']:.2%} | NDCG@{TOP_K} = {metricas['ndcg']:.4f}")
             del rec
         except Exception:
             print(f"\n*** '{nome}' falhou — seguindo para o próximo ***")
@@ -310,8 +292,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------ #
     tab = []
     tab.append("=" * 70)
-    tab.append(f"RESULTADOS — {len(test_cases)} playlists, "
-               f"{total_removidas} músicas removidas, Top-{TOP_K}")
+    tab.append(f"RESULTADOS — {len(test_cases)} playlists, {total_removidas} músicas removidas, Top-{TOP_K}")
     tab.append("=" * 70)
     tab.append("Métricas (médias por playlist, exceto o recall micro):")
     tab.append(f"  Recall@{TOP_K} (micro) : removidas recuperadas / total de removidas")
@@ -320,17 +301,14 @@ if __name__ == "__main__":
     tab.append(f"  F1@{TOP_K}             : média harmônica de precision e recall")
     tab.append(f"  NDCG@{TOP_K}           : qualidade do ranking (acertos no topo valem mais)")
     tab.append("")
-    header = (f"{'Modelo':<35} {'Recall(mi)':>10} {'Recall(ma)':>10} "
-              f"{'Precision':>10} {'F1':>8} {'NDCG':>8} {'Tempo':>8}")
+    header = (f"{'Modelo':<35} {'Recall(mi)':>10} {'Recall(ma)':>10} {'Precision':>10} {'F1':>8} {'NDCG':>8} {'Tempo':>8}")
     tab.append(header)
     tab.append("-" * len(header))
     for nome, path, _ in MODELS:
         m = resultados.get(nome)
         if m is not None:
-            tab.append(f"{nome:<35} {m['recall_micro']:>10.2%} "
-                       f"{m['recall_macro']:>10.2%} {m['precision']:>10.2%} "
-                       f"{m['f1']:>8.2%} {m['ndcg']:>8.4f} "
-                       f"{m['tempo_min']:>6.1f}m")
+            tab.append(f"{nome:<35} {m['recall_micro']:>10.2%} {m['recall_macro']:>10.2%} "
+                       f"{m['precision']:>10.2%} {m['f1']:>8.2%} {m['ndcg']:>8.4f} {m['tempo_min']:>6.1f}m")
         elif nome in resultados:
             tab.append(f"{nome:<35} FALHOU (ver console/traceback)")
         else:

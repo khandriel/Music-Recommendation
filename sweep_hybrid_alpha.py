@@ -1,12 +1,12 @@
 # =============================================================================
 # sweep_hybrid_alpha.py — Varredura do peso ALPHA do híbrido (late fusion)
 #
-# Mede, no mesmo conjunto de teste do compare_models.py, como o Recall/NDCG do
-# híbrido variam com ALPHA (peso do colaborativo; 1-ALPHA vai para o content).
+# Mede, no mesmo conjunto de teste do compare_models.py, como o Recall/NDCG do híbrido variam com
+# ALPHA (peso do colaborativo; 1-ALPHA vai para o content).
 #
-# O score do colaborativo e a normalização min-max são computados uma vez por
-# playlist; para cada ALPHA só se refaz a combinação ponderada + top-k. ALPHA=1.0
-# equivale ao colaborativo puro e ALPHA=0.0 ao content puro.
+# O score do colaborativo e a normalização min-max são computados uma vez por playlist; para cada
+# ALPHA só se refaz a combinação ponderada + top-k. ALPHA=1.0 equivale ao colaborativo puro e
+# ALPHA=0.0 ao content puro.
 #
 # COLAB_KEY define o parceiro colaborativo ("neumf" | "itemknn" | "als").
 # =============================================================================
@@ -55,11 +55,9 @@ if __name__ == "__main__":
     data = load_or_process_interactions(N_FILES)
     interactions_df, pid_map, track_map, reverse_track_map, uri_to_name = data
 
-    print(f"\nConjunto de teste (seed={SEED}, {NUM_PLAYLISTS_TEST} playlists, "
-          f"{PCT_REMOVED:.0%} removido)...")
+    print(f"\nConjunto de teste (seed={SEED}, {NUM_PLAYLISTS_TEST} playlists, {PCT_REMOVED:.0%} removido)...")
     rng = np.random.default_rng(SEED)
-    test_cases = build_test_cases(interactions_df, rng,
-                                  NUM_PLAYLISTS_TEST, PCT_REMOVED)
+    test_cases = build_test_cases(interactions_df, rng, NUM_PLAYLISTS_TEST, PCT_REMOVED)
 
     # ---- Carrega os DOIS componentes ----
     mod_name, cls_name, _ = COLAB_REGISTRY[COLAB_KEY]
@@ -79,8 +77,7 @@ if __name__ == "__main__":
     total_removed = 0
 
     t0 = time.time()
-    for pid, removed, remaining in tqdm(test_cases, desc=f"Varredura {COLAB_KEY}",
-                                        unit="pl"):
+    for pid, removed, remaining in tqdm(test_cases, desc=f"Varredura {COLAB_KEY}", unit="pl"):
         removed_set = set(removed.tolist())
         n_rem = len(removed)
         total_removed += n_rem
@@ -98,8 +95,7 @@ if __name__ == "__main__":
 
         for ai, alpha in enumerate(ALPHAS):
             top = _fuse_topk(nc, pc, nb, pb, alpha, num_tracks, TOP_K)
-            hit_ranks = [r for r, t in enumerate(top.tolist(), start=1)
-                         if t in removed_set]
+            hit_ranks = [r for r, t in enumerate(top.tolist(), start=1) if t in removed_set]
             h = len(hit_ranks)
             hits[ai]       += h
             recall_sum[ai] += h / n_rem
@@ -108,8 +104,7 @@ if __name__ == "__main__":
                 ndcg_sum[ai] += dcg / idcg
 
     npl = len(test_cases)
-    print(f"\nVarredura concluída em {(time.time()-t0)/60:.1f} min "
-          f"({npl} playlists, {total_removed} removidas)\n")
+    print(f"\nVarredura concluída em {(time.time()-t0)/60:.1f} min ({npl} playlists, {total_removed} removidas)\n")
 
     # ---- Tabela ----
     print("=" * 64)
@@ -122,10 +117,7 @@ if __name__ == "__main__":
     best_ai = int(np.argmax(hits))
     for ai, alpha in enumerate(ALPHAS):
         marca = "  <- melhor" if ai == best_ai else ""
-        tag = ("  (=content puro)" if alpha == 0.0 else
-               "  (=colab puro)"  if alpha == 1.0 else "")
-        print(f"{alpha:>6.2f} {hits[ai]/total_removed:>10.2%} "
-              f"{recall_sum[ai]/npl:>10.2%} {ndcg_sum[ai]/npl:>9.4f}{marca}{tag}")
+        tag = ("  (=content puro)" if alpha == 0.0 else "  (=colab puro)" if alpha == 1.0 else "")
+        print(f"{alpha:>6.2f} {hits[ai]/total_removed:>10.2%} {recall_sum[ai]/npl:>10.2%} {ndcg_sum[ai]/npl:>9.4f}{marca}{tag}")
     print("=" * 64)
-    print(f"Melhor ALPHA por Recall(micro): {ALPHAS[best_ai]:.2f} "
-          f"({hits[best_ai]/total_removed:.2%})")
+    print(f"Melhor ALPHA por Recall(micro): {ALPHAS[best_ai]:.2f} ({hits[best_ai]/total_removed:.2%})")

@@ -1,13 +1,12 @@
 # =============================================================================
 # sweep_pesos_content.py — Varredura do split de pesos do Content-Based
 #
-# Avalia cada conjunto de pesos (CONFIGS) entre as features do content
-# (artista/genero/ano) no mesmo conjunto de teste do compare_models.py,
-# medindo Recall e NDCG@500.
+# Avalia cada conjunto de pesos (CONFIGS) entre as features do content (artista/genero/ano) no mesmo
+# conjunto de teste do compare_models.py, medindo Recall e NDCG@500.
 #
-# Por playlist, os vetores de score por feature são computados uma vez; cada
-# config é só uma soma ponderada + top-k, no espaço do catálogo de conteúdo,
-# mapeado para track_encoded para conferir os acertos.
+# Por playlist, os vetores de score por feature são computados uma vez; cada config é só uma soma
+# ponderada + top-k, no espaço do catálogo de conteúdo, mapeado para track_encoded para conferir os
+# acertos.
 # =============================================================================
 
 import os
@@ -56,11 +55,9 @@ if __name__ == "__main__":
     data = load_or_process_interactions(N_FILES)
     interactions_df, pid_map, track_map, reverse_track_map, uri_to_name = data
 
-    print(f"\nConjunto de teste (seed={SEED}, {NUM_PLAYLISTS_TEST} playlists, "
-          f"{PCT_REMOVED:.0%} removido)...")
+    print(f"\nConjunto de teste (seed={SEED}, {NUM_PLAYLISTS_TEST} playlists, {PCT_REMOVED:.0%} removido)...")
     rng = np.random.default_rng(SEED)
-    test_cases = build_test_cases(interactions_df, rng,
-                                  NUM_PLAYLISTS_TEST, PCT_REMOVED)
+    test_cases = build_test_cases(interactions_df, rng, NUM_PLAYLISTS_TEST, PCT_REMOVED)
 
     print("\nCarregando Content...")
     rec = ContentRecommender.load_or_train(*data)
@@ -103,8 +100,7 @@ if __name__ == "__main__":
             order = order[np.isfinite(v[order])]
             enc = cidx_to_enc[order]
 
-            hit_ranks = [r for r, e in enumerate(enc.tolist(), start=1)
-                         if e in removed_set]
+            hit_ranks = [r for r, e in enumerate(enc.tolist(), start=1) if e in removed_set]
             h = len(hit_ranks)
             hits[ci]       += h
             recall_sum[ci] += h / n_rem
@@ -113,8 +109,7 @@ if __name__ == "__main__":
                 ndcg_sum[ci] += dcg / idcg
 
     npl = len(test_cases)
-    print(f"\nConcluído em {(time.time()-t0)/60:.1f} min "
-          f"({npl} playlists, {total_removed} removidas)\n")
+    print(f"\nConcluído em {(time.time()-t0)/60:.1f} min ({npl} playlists, {total_removed} removidas)\n")
 
     recall_mi = hits / total_removed
     recall_ma = recall_sum / npl
@@ -127,8 +122,7 @@ if __name__ == "__main__":
     print("-" * 76)
     for ci in np.argsort(-recall_mi):
         marca = "  <-" if ci == int(np.argmax(recall_mi)) else ""
-        print(f"{_nome_config(CONFIGS[ci]):<46} {recall_mi[ci]:>9.2%} "
-              f"{recall_ma[ci]:>9.2%} {ndcg[ci]:>8.4f}{marca}")
+        print(f"{_nome_config(CONFIGS[ci]):<46} {recall_mi[ci]:>9.2%} {recall_ma[ci]:>9.2%} {ndcg[ci]:>8.4f}{marca}")
     print("=" * 76)
     best = int(np.argmax(recall_mi))
     print(f"MELHOR: {_nome_config(CONFIGS[best])}  ->  Recall@{TOP_K} = {recall_mi[best]:.2%}")

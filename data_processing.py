@@ -2,7 +2,6 @@
 # data_processing.py — Carregamento e Pré-processamento dos Dados
 #
 # REQUISITOS: pip install kaggle kagglehub pandas numpy tqdm
-#
 # =============================================================================
 
 import kagglehub
@@ -20,14 +19,13 @@ N_FILES = 350  # Número de arquivos JSON a carregar (cada arquivo = 1000 playli
 
 def load_dataset(n_files: int = N_FILES) -> pd.DataFrame:
     """
-    Baixa (ou usa cache) e carrega N arquivos JSON do dataset.
-    Cada arquivo contém 1000 playlists.
-    Retorna um DataFrame com todas as playlists carregadas.
+    Baixa (ou usa cache) e carrega N arquivos JSON do dataset (cada arquivo = 1000 playlists) e
+    retorna um DataFrame com todas as playlists carregadas.
     """
     path = kagglehub.dataset_download("himanshuwagh/spotify-million")
     data_path = os.path.join(path, "data")
-    # sorted() garante a MESMA ordem de arquivos em qualquer sistema —
-    # sem isso, "os primeiros n_files" poderiam variar entre máquinas.
+    # sorted() garante a MESMA ordem de arquivos em qualquer sistema — sem isso, "os primeiros
+    # n_files" poderiam variar entre máquinas.
     json_files = sorted(glob.glob(os.path.join(data_path, "*.json")))
 
     all_playlists = []
@@ -46,26 +44,25 @@ def load_dataset(n_files: int = N_FILES) -> pd.DataFrame:
 
 def build_interactions(df: pd.DataFrame) -> tuple:
     """
-    Expande as playlists em pares (playlist, música) e cria os mapeamentos
-    de IDs para índices numéricos usados pelos modelos.
+    Expande as playlists em pares (playlist, música) e cria os mapeamentos de IDs para índices
+    numéricos usados pelos modelos.
 
     Retorna:
-        interactions_df   — DataFrame com colunas pid, track_uri,
-                            pid_encoded, track_encoded
+        interactions_df   — DataFrame com colunas pid, track_uri, pid_encoded, track_encoded
         pid_map           — dict {pid -> índice}
         track_map         — dict {track_uri -> índice}
         reverse_track_map — dict {índice -> track_uri}
         uri_to_name       — dict {track_uri -> track_name}
 
     Otimizações de memória:
-      - track_name NÃO é guardado no DataFrame (só vira o dict uri_to_name,
-        deduplicado). Nenhum modelo lê a coluna track_name das interações.
+      - track_name NÃO é guardado no DataFrame (só vira o dict uri_to_name, deduplicado). Nenhum
+        modelo lê a coluna track_name das interações.
       - track_uri vira 'category' (deduplica as strings repetidas internamente).
       - Colunas inteiras usam int32 em vez do int64 padrão.
     """
-    # Iterar direto sobre as colunas (zip) é bem mais rápido que df.iterrows().
-    # Guardamos só pid e track_uri nas interações; o nome vai para um dict
-    # deduplicado, evitando repetir a string em milhões de linhas.
+    # Iterar direto sobre as colunas (zip) é bem mais rápido que df.iterrows(). Guardamos só pid e
+    # track_uri nas interações; o nome vai para um dict deduplicado, evitando repetir a string em
+    # milhões de linhas.
     pids        = []
     uris        = []
     uri_to_name = {}
@@ -77,10 +74,9 @@ def build_interactions(df: pd.DataFrame) -> tuple:
             if uri not in uri_to_name:
                 uri_to_name[uri] = track['track_name']
 
-    # Constrói as colunas já com o dtype final. Passar listas Python cruas faria
-    # o pandas rodar maybe_convert_objects, que aloca um buffer complex128
-    # gigante só para inferir o tipo numérico (causa de MemoryError com dados
-    # grandes). np.asarray(int32) e pd.Categorical evitam essa inferência.
+    # Constrói as colunas já com o dtype final. Passar listas Python cruas faria o pandas rodar
+    # maybe_convert_objects, que aloca um buffer complex128 gigante só para inferir o tipo numérico
+    # (causa de MemoryError com dados grandes). np.asarray(int32) e pd.Categorical evitam a inferência.
     interactions_df = pd.DataFrame({
         'pid':       np.asarray(pids, dtype=np.int32),
         'track_uri': pd.Categorical(uris),
@@ -103,16 +99,14 @@ def build_interactions(df: pd.DataFrame) -> tuple:
 
 # =============================================================================
 # CACHE DOS DADOS PROCESSADOS
+#
+# O download bruto NUNCA se repete (o kagglehub guarda os arquivos em ~/.cache/kagglehub). O que
+# custava minutos a cada execução era reler e parsear as centenas de JSONs + montar as interações.
+# Este cache guarda o RESULTADO do pré-processamento em um único joblib, carregado em segundos.
+#
+# O n_files usado fica registrado dentro do cache: se você mudar N_FILES, o cache é invalidado e os
+# dados são reprocessados AUTOMATICAMENTE — não é preciso apagar a pasta cache/ à mão.
 # =============================================================================
-#
-# O download bruto NUNCA se repete (o kagglehub guarda os arquivos em
-# ~/.cache/kagglehub). O que custava minutos a cada execução era reler e
-# parsear as centenas de JSONs + montar as interações. Este cache guarda o
-# RESULTADO do pré-processamento em um único joblib, carregado em segundos.
-#
-# O n_files usado fica registrado dentro do cache: se você mudar N_FILES, o
-# cache é invalidado e os dados são reprocessados AUTOMATICAMENTE — não é
-# preciso apagar a pasta cache/ à mão.
 
 CACHE_DIR  = "cache"
 CACHE_PATH = os.path.join(CACHE_DIR, "interactions_cache.joblib")
@@ -120,9 +114,9 @@ CACHE_PATH = os.path.join(CACHE_DIR, "interactions_cache.joblib")
 
 def load_or_process_interactions(n_files: int = N_FILES) -> tuple:
     """
-    Retorna (interactions_df, pid_map, track_map, reverse_track_map,
-    uri_to_name), usando o cache em disco quando existir e tiver sido gerado
-    com o MESMO n_files; caso contrário, processa do zero e salva o cache.
+    Retorna (interactions_df, pid_map, track_map, reverse_track_map, uri_to_name), usando o cache em
+    disco quando existir e tiver sido gerado com o MESMO n_files; caso contrário, processa do zero e
+    salva o cache.
     """
     if os.path.exists(CACHE_PATH):
         try:
@@ -132,13 +126,10 @@ def load_or_process_interactions(n_files: int = N_FILES) -> tuple:
             payload = None
         if payload is not None:
             if payload.get('n_files') == n_files:
-                print(f"Cache encontrado (n_files={n_files}) — "
-                      f"carregando de '{CACHE_PATH}'...")
-                return (payload['interactions_df'], payload['pid_map'],
-                        payload['track_map'], payload['reverse_track_map'],
-                        payload['uri_to_name'])
-            print(f"Cache foi gerado com n_files={payload.get('n_files')}, "
-                  f"mas o atual é {n_files} — reprocessando...")
+                print(f"Cache encontrado (n_files={n_files}) — carregando de '{CACHE_PATH}'...")
+                return (payload['interactions_df'], payload['pid_map'], payload['track_map'],
+                        payload['reverse_track_map'], payload['uri_to_name'])
+            print(f"Cache foi gerado com n_files={payload.get('n_files')}, mas o atual é {n_files} — reprocessando...")
 
     df = load_dataset(n_files)
     interactions_df, pid_map, track_map, reverse_track_map, uri_to_name = build_interactions(df)
@@ -159,8 +150,8 @@ def load_or_process_interactions(n_files: int = N_FILES) -> tuple:
 
 def build_content_catalog(df: pd.DataFrame) -> tuple:
     """
-    Cria um catálogo de músicas únicas com metadados textuais (nome + artista)
-    para uso pelo modelo de Filtragem Baseada em Conteúdo.
+    Cria um catálogo de músicas únicas com metadados textuais (nome + artista) para uso pelo modelo
+    de Filtragem Baseada em Conteúdo.
 
     Retorna:
         content_df   — DataFrame com track_uri, track_name, artist_name, metadata
